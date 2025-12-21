@@ -1,0 +1,83 @@
+# Raspberry Pi Voice Processor - Configuração de Exemplo
+# ======================================================
+# Copie este arquivo para config.yaml e ajuste conforme necessário
+
+# Modo de operação: local, api, hybrid
+mode: "hybrid"
+
+# Configuração de Áudio (ReSpeaker)
+audio:
+  device: ""
+  sample_rate: 16000
+  channels: 1
+  chunk_size: 1024
+  max_duration: 30
+  silence_duration: 2.0
+  vad:
+    enabled: true
+    aggressiveness: 2
+    min_speech_duration: 0.5
+
+# Configuração do Whisper (Transcrição)
+whisper:
+  model: "tiny"
+  language: "pt"
+  use_cpp: true
+  threads: 4
+  quantization: "q5_0"
+  beam_size: 1
+  suppress_blank: true
+
+# Configuração do LLM (Resumo/Processamento)
+llm:
+  provider: "local"
+  local:
+    model: "tinyllama"
+    model_path: ""
+    context_size: 512
+    threads: 4
+    max_tokens: 150
+    temperature: 0.3
+    quantization: "q4_0"
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+    model: "gpt-4o-mini"
+    max_tokens: 200
+    temperature: 0.3
+  anthropic:
+    api_key: "${ANTHROPIC_API_KEY}"
+    model: "claude-3-haiku-20240307"
+    max_tokens: 200
+    temperature: 0.3
+  ollama:
+    host: "http://localhost:11434"
+    model: "tinyllama"
+    max_tokens: 200
+
+# Prompts
+prompts:
+  summarize: |
+    Resuma o seguinte texto de forma concisa:
+    {text}
+    Resumo:
+  extract_actions: |
+    Extraia as ações mencionadas:
+    {text}
+    Ações:
+  custom: ""
+
+# Sistema
+system:
+  cache_enabled: true
+  cache_dir: "~/.cache/voice-processor"
+  cache_ttl: 3600
+  log_level: "INFO"
+  log_file: ""
+  low_memory_mode: true
+  timeout: 60
+
+# Hardware
+hardware:
+  respeaker_type: "2mic"
+  led_enabled: true
+  button_gpio: 17

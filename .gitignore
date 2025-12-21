@@ -1,0 +1,79 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+.venv/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# Modelos (muito grandes para git)
+models/*.gguf
+models/*.bin
+external/whisper.cpp/models/*.bin
+external/llama.cpp/models/
+
+# Dependências externas compiladas
+external/whisper.cpp/main
+external/whisper.cpp/build/
+external/llama.cpp/main
+external/llama.cpp/build/
+
+# Cache
+.cache/
+cache/
+*.cache
+
+# Logs
+logs/
+*.log
+
+# Arquivos temporários
+tmp/
+temp/
+*.tmp
+*.wav
+*.mp3
+
+# Configuração local (pode conter API keys)
+config/config.local.yaml
+.env
+.env.local
+
+# Sistema
+.DS_Store
+Thumbs.db
+
+# Pytest
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Jupyter
+.ipynb_checkpoints/

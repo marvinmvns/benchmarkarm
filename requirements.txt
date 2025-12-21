@@ -1,5 +1,43 @@
-pandas>=1.3.0
-numpy>=1.21.0
-matplotlib>=3.4.0
-seaborn>=0.11.0
+# Raspberry Pi Voice Processor - Dependências
+# ============================================
 
+# Core
+PyYAML>=6.0
+python-dotenv>=1.0.0
+
+# Áudio
+pyaudio>=0.2.14
+sounddevice>=0.4.6
+soundfile>=0.12.1
+numpy>=1.24.0
+
+# VAD (Voice Activity Detection)
+webrtcvad>=2.0.10
+
+# Whisper Python (fallback se whisper.cpp não disponível)
+# openai-whisper>=20231117  # Comentado: muito pesado para Pi Zero
+
+# Para usar Whisper via binding Python
+# whispercpp>=0.0.17
+
+# LLM APIs
+openai>=1.0.0
+anthropic>=0.18.0
+httpx>=0.25.0
+
+# Utilitários
+rich>=13.0.0
+click>=8.1.0
+pydantic>=2.0.0
+cachetools>=5.3.0
+
+# Opcional: GPIO para LEDs do ReSpeaker
+# RPi.GPIO>=0.7.1
+# spidev>=3.6
+
+# Opcional: Faster Whisper (mais rápido que whisper original)
+# faster-whisper>=0.10.0
+
+# Desenvolvimento
+# pytest>=7.4.0
+# black>=23.0.0

@@ -1,0 +1,160 @@
+# Raspberry Pi Voice Processor - Configuração
+# =============================================
+
+# Modo de operação: local, api, hybrid
+mode: "hybrid"
+
+# Configuração de Áudio (ReSpeaker)
+audio:
+  # Dispositivo de áudio (deixe vazio para auto-detectar)
+  device: ""
+
+  # Taxa de amostragem (16000 é ideal para Whisper)
+  sample_rate: 16000
+
+  # Canais (1 = mono, recomendado)
+  channels: 1
+
+  # Tamanho do chunk em frames
+  chunk_size: 1024
+
+  # Duração máxima de gravação em segundos
+  max_duration: 30
+
+  # Silêncio para parar gravação (segundos)
+  silence_duration: 2.0
+
+  # VAD (Voice Activity Detection)
+  vad:
+    enabled: true
+    # Agressividade: 0-3 (3 = mais agressivo, filtra mais ruído)
+    aggressiveness: 2
+    # Duração mínima de fala para considerar válido (segundos)
+    min_speech_duration: 0.5
+
+# Configuração do Whisper (Transcrição)
+whisper:
+  # Modelo: tiny, base, small, medium, large
+  # Para Pi Zero 2W: use "tiny" ou "base"
+  # Para Pi 4+: pode usar "small"
+  model: "tiny"
+
+  # Idioma: pt, en, es, etc. (vazio = auto-detect)
+  language: "pt"
+
+  # Usar whisper.cpp (mais rápido) ou whisper Python
+  use_cpp: true
+
+  # Número de threads (0 = auto)
+  threads: 4
+
+  # Quantização do modelo (para whisper.cpp)
+  # Opções: f16, q8_0, q5_0, q4_0
+  quantization: "q5_0"
+
+  # Beam search size (menor = mais rápido)
+  beam_size: 1
+
+  # Suprimir tokens de silêncio
+  suppress_blank: true
+
+# Configuração do LLM (Resumo/Processamento)
+llm:
+  # Provider: local, openai, anthropic, ollama
+  provider: "local"
+
+  # Configuração Local (llama.cpp)
+  local:
+    # Modelo: tinyllama, phi2, gemma-2b
+    model: "tinyllama"
+
+    # Caminho do modelo (se custom)
+    model_path: ""
+
+    # Contexto máximo
+    context_size: 512
+
+    # Threads
+    threads: 4
+
+    # Tokens máximos na resposta
+    max_tokens: 150
+
+    # Temperatura (0 = determinístico)
+    temperature: 0.3
+
+    # Quantização
+    quantization: "q4_0"
+
+  # Configuração OpenAI
+  openai:
+    api_key: "${OPENAI_API_KEY}"
+    model: "gpt-4o-mini"
+    max_tokens: 200
+    temperature: 0.3
+
+  # Configuração Anthropic
+  anthropic:
+    api_key: "${ANTHROPIC_API_KEY}"
+    model: "claude-3-haiku-20240307"
+    max_tokens: 200
+    temperature: 0.3
+
+  # Configuração Ollama (servidor local)
+  ollama:
+    host: "http://localhost:11434"
+    model: "tinyllama"
+    max_tokens: 200
+
+# Prompts para o LLM
+prompts:
+  # Prompt para resumo
+  summarize: |
+    Resuma o seguinte texto de forma concisa, mantendo os pontos principais:
+
+    {text}
+
+    Resumo:
+
+  # Prompt para extração de ações
+  extract_actions: |
+    Extraia as ações e tarefas mencionadas no texto:
+
+    {text}
+
+    Ações:
+
+  # Prompt customizado
+  custom: ""
+
+# Sistema
+system:
+  # Habilitar cache de transcrições
+  cache_enabled: true
+
+  # Diretório de cache
+  cache_dir: "~/.cache/voice-processor"
+
+  # Tempo de vida do cache (segundos)
+  cache_ttl: 3600
+
+  # Logging
+  log_level: "INFO"
+  log_file: ""
+
+  # Modo de baixa memória (para Pi Zero 2W)
+  low_memory_mode: true
+
+  # Tempo máximo de processamento (segundos)
+  timeout: 60
+
+# Hardware
+hardware:
+  # Tipo de ReSpeaker: 2mic, 4mic, 6mic
+  respeaker_type: "2mic"
+
+  # Habilitar LEDs do ReSpeaker
+  led_enabled: true
+
+  # GPIO do botão (se disponível)
+  button_gpio: 17
