@@ -158,3 +158,87 @@ hardware:
 
   # GPIO do botão (se disponível)
   button_gpio: 17
+
+# =============================================================================
+# Fila Offline (para quando não há conexão com internet)
+# =============================================================================
+offline_queue:
+  # Habilitar sistema de filas offline
+  enabled: true
+
+  # Caminho do banco de dados SQLite
+  db_path: "~/.cache/voice-processor/queue.db"
+
+  # Tamanho máximo da fila
+  max_queue_size: 1000
+
+  # Delay base para retry (segundos)
+  retry_delay_base: 30.0
+
+  # Máximo de retries por tarefa
+  max_retries: 3
+
+  # Intervalo de verificação de conectividade (segundos)
+  connectivity_check_interval: 60.0
+
+  # Processar fila automaticamente quando voltar online
+  auto_process_on_reconnect: true
+
+  # Fallback para LLM local quando offline
+  use_local_fallback: true
+
+# =============================================================================
+# Gerenciamento de Energia (Feature Toggle)
+# =============================================================================
+power_management:
+  # *** FEATURE TOGGLE - Habilitar gerenciamento de energia ***
+  enabled: false
+
+  # Modo padrão: performance, balanced, power_save, ultra_power_save
+  default_mode: "balanced"
+
+  # Modo automático (ajusta baseado em atividade e temperatura)
+  auto_adjust: true
+
+  # Tempo de inatividade para entrar em modo idle (segundos)
+  idle_timeout: 60.0
+
+  # Modo quando idle
+  idle_mode: "power_save"
+
+  # Limites de temperatura para throttling automático
+  thermal:
+    # Temperatura para reduzir performance (Celsius)
+    threshold_high: 70.0
+    # Temperatura crítica (Celsius)
+    threshold_critical: 80.0
+
+  # Configurações por modo
+  profiles:
+    performance:
+      cpu_governor: "performance"
+      cpu_freq_max: null  # Sem limite
+      disable_hdmi: false
+      disable_bluetooth: false
+      led_brightness: 255
+
+    balanced:
+      cpu_governor: "ondemand"
+      cpu_freq_max: null
+      disable_hdmi: false
+      disable_bluetooth: false
+      led_brightness: 128
+
+    power_save:
+      cpu_governor: "powersave"
+      cpu_freq_max: 600  # MHz
+      disable_hdmi: true
+      disable_bluetooth: true
+      led_brightness: 32
+
+    ultra_power_save:
+      cpu_governor: "powersave"
+      cpu_freq_max: 400  # MHz
+      disable_hdmi: true
+      disable_bluetooth: true
+      led_brightness: 0
