@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Voice Processor - Configuração</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <header class="header">
+            <h1>🎙️ Voice Processor</h1>
+            <div class="status-bar">
+                <span id="status-indicator" class="status-dot"></span>
+                <span id="status-text">Carregando...</span>
+            </div>
+        </header>
+
+        <!-- Navigation -->
+        <nav class="nav-tabs">
+            <button class="tab-btn active" data-tab="general">Geral</button>
+            <button class="tab-btn" data-tab="audio">Áudio</button>
+            <button class="tab-btn" data-tab="whisper">Whisper</button>
+            <button class="tab-btn" data-tab="llm">LLM</button>
+            <button class="tab-btn" data-tab="offline">Offline</button>
+            <button class="tab-btn" data-tab="power">Energia</button>
+            <button class="tab-btn" data-tab="system">Sistema</button>
+        </nav>
+
+        <!-- Content -->
+        <main class="content">
+            <!-- General Tab -->
+            <section id="tab-general" class="tab-content active">
+                <h2>Configurações Gerais</h2>
+
+                <div class="form-group">
+                    <label for="mode">Modo de Operação</label>
+                    <select id="mode" name="mode">
+                        <option value="local">Local (Offline)</option>
+                        <option value="api">API (Online)</option>
+                        <option value="hybrid">Híbrido (Recomendado)</option>
+                    </select>
+                    <small>Local: tudo no dispositivo | API: usa serviços externos | Híbrido: melhor dos dois</small>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="cache_enabled" name="system.cache_enabled">
+                        Habilitar Cache
+                    </label>
+                    <small>Reduz processamento redundante</small>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="low_memory_mode" name="system.low_memory_mode">
+                        Modo Baixa Memória
+                    </label>
+                    <small>Otimiza para dispositivos com pouca RAM (Pi Zero 2W)</small>
+                </div>
+            </section>
+
+            <!-- Audio Tab -->
+            <section id="tab-audio" class="tab-content">
+                <h2>Configurações de Áudio</h2>
+
+                <div class="form-group">
+                    <label for="sample_rate">Taxa de Amostragem</label>
+                    <select id="sample_rate" name="audio.sample_rate">
+                        <option value="8000">8000 Hz</option>
+                        <option value="16000">16000 Hz (Recomendado)</option>
+                        <option value="22050">22050 Hz</option>
+                        <option value="44100">44100 Hz</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="max_duration">Duração Máxima (segundos)</label>
+                    <input type="number" id="max_duration" name="audio.max_duration" min="5" max="120" value="30">
+                </div>
+
+                <div class="form-group">
+                    <label for="silence_duration">Silêncio para Parar (segundos)</label>
+                    <input type="number" id="silence_duration" name="audio.silence_duration" min="0.5" max="10" step="0.5" value="2.0">
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="vad_enabled" name="audio.vad.enabled" checked>
+                        VAD (Detecção de Voz)
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="vad_aggressiveness">Agressividade VAD</label>
+                    <input type="range" id="vad_aggressiveness" name="audio.vad.aggressiveness" min="0" max="3" value="2">
+                    <span id="vad_aggressiveness_value">2</span>
+                    <small>0 = menos filtro, 3 = mais filtro de ruído</small>
+                </div>
+
+                <div class="form-group">
+                    <button type="button" id="btn-test-audio" class="btn btn-secondary">🔊 Testar Áudio</button>
+                    <pre id="audio-test-result" class="result-box"></pre>
+                </div>
+            </section>
+
+            <!-- Whisper Tab -->
+            <section id="tab-whisper" class="tab-content">
+                <h2>Configurações do Whisper</h2>
+
+                <div class="form-group">
+                    <label for="whisper_model">Modelo</label>
+                    <select id="whisper_model" name="whisper.model">
+                        <option value="tiny">Tiny (75MB) - Mais rápido</option>
+                        <option value="base">Base (142MB) - Equilibrado</option>
+                        <option value="small">Small (466MB) - Mais preciso</option>
+                    </select>
+                    <small>Para Pi Zero 2W, use Tiny ou Base</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="whisper_language">Idioma</label>
+                    <select id="whisper_language" name="whisper.language">
+                        <option value="pt">Português</option>
+                        <option value="en">English</option>
+                        <option value="es">Español</option>
+                        <option value="">Auto-detectar</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="whisper_use_cpp" name="whisper.use_cpp" checked>
+                        Usar whisper.cpp (Mais rápido)
+                    </label>
+                </div>
+
+                <div class="form-group">
+                    <label for="whisper_threads">Threads</label>
+                    <input type="number" id="whisper_threads" name="whisper.threads" min="1" max="8" value="4">
+                </div>
+
+                <div class="form-group">
+                    <label for="whisper_beam_size">Beam Size</label>
+                    <input type="number" id="whisper_beam_size" name="whisper.beam_size" min="1" max="5" value="1">
+                    <small>1 = mais rápido (greedy), maior = mais preciso</small>
+                </div>
+            </section>
+
+            <!-- LLM Tab -->
+            <section id="tab-llm" class="tab-content">
+                <h2>Configurações do LLM</h2>
+
+                <div class="form-group">
+                    <label for="llm_provider">Provedor</label>
+                    <select id="llm_provider" name="llm.provider">
+                        <option value="local">Local (llama.cpp)</option>
+                        <option value="openai">OpenAI</option>
+                        <option value="anthropic">Anthropic</option>
+                        <option value="ollama">Ollama</option>
+                    </select>
+                </div>
+
+                <!-- Local LLM -->
+                <div id="llm-local-config" class="config-section">
+                    <h3>LLM Local</h3>
+                    <div class="form-group">
+                        <label for="local_model">Modelo</label>
+                        <select id="local_model" name="llm.local.model">
+                            <option value="tinyllama">TinyLlama (1.1B)</option>
+                            <option value="phi2">Phi-2 (2.7B)</option>
+                            <option value="gemma-2b">Gemma 2B</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="local_context_size">Contexto</label>
+                        <input type="number" id="local_context_size" name="llm.local.context_size" min="128" max="2048" value="512">
+                    </div>
+                    <div class="form-group">
+                        <label for="local_max_tokens">Tokens Máximos</label>
+                        <input type="number" id="local_max_tokens" name="llm.local.max_tokens" min="50" max="500" value="150">
+                    </div>
+                </div>
+
+                <!-- API Config -->
+                <div id="llm-api-config" class="config-section" style="display:none;">
+                    <h3>Configuração API</h3>
+                    <div class="form-group">
+                        <label for="api_key">API Key</label>
+                        <input type="password" id="api_key" placeholder="sk-...">
+                        <small>⚠️ Nunca compartilhe sua API key</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="api_model">Modelo</label>
+                        <input type="text" id="api_model" value="gpt-4o-mini">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="llm_temperature">Temperatura</label>
+                    <input type="range" id="llm_temperature" name="llm.local.temperature" min="0" max="1" step="0.1" value="0.3">
+                    <span id="llm_temperature_value">0.3</span>
+                    <small>0 = determinístico, 1 = criativo</small>
+                </div>
+            </section>
+
+            <!-- Offline Queue Tab -->
+            <section id="tab-offline" class="tab-content">
+                <h2>Fila Offline</h2>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="offline_enabled" name="offline_queue.enabled" checked>
+                        Habilitar Fila Offline
+                    </label>
+                    <small>Armazena tarefas quando sem internet</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="max_queue_size">Tamanho Máximo da Fila</label>
+                    <input type="number" id="max_queue_size" name="offline_queue.max_queue_size" min="100" max="10000" value="1000">
+                </div>
+
+                <div class="form-group">
+                    <label for="retry_delay">Delay Base para Retry (s)</label>
+                    <input type="number" id="retry_delay" name="offline_queue.retry_delay_base" min="10" max="300" value="30">
+                </div>
+
+                <div class="form-group">
+                    <label for="max_retries">Máximo de Retries</label>
+                    <input type="number" id="max_retries" name="offline_queue.max_retries" min="1" max="10" value="3">
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="use_local_fallback" name="offline_queue.use_local_fallback" checked>
+                        Usar LLM Local como Fallback
+                    </label>
+                </div>
+
+                <div class="status-card">
+                    <h3>Status da Fila</h3>
+                    <div id="queue-stats">
+                        <p>Pendentes: <span id="queue-pending">-</span></p>
+                        <p>Processando: <span id="queue-processing">-</span></p>
+                        <p>Concluídos: <span id="queue-completed">-</span></p>
+                        <p>Conectividade: <span id="queue-online">-</span></p>
+                    </div>
+                    <button type="button" id="btn-refresh-queue" class="btn btn-secondary">🔄 Atualizar</button>
+                </div>
+            </section>
+
+            <!-- Power Management Tab -->
+            <section id="tab-power" class="tab-content">
+                <h2>Gerenciamento de Energia</h2>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="power_enabled" name="power_management.enabled">
+                        <strong>Habilitar Gerenciamento de Energia</strong>
+                    </label>
+                    <small>Feature toggle - controla consumo de energia</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="power_mode">Modo Padrão</label>
+                    <select id="power_mode" name="power_management.default_mode">
+                        <option value="performance">Performance (~1800mW)</option>
+                        <option value="balanced">Equilibrado (~1200mW)</option>
+                        <option value="power_save">Economia (~800mW)</option>
+                        <option value="ultra_power_save">Ultra Economia (~500mW)</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="power_auto_adjust" name="power_management.auto_adjust" checked>
+                        Ajuste Automático
+                    </label>
+                    <small>Ajusta baseado em atividade e temperatura</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="idle_timeout">Timeout para Idle (s)</label>
+                    <input type="number" id="idle_timeout" name="power_management.idle_timeout" min="30" max="600" value="60">
+                </div>
+
+                <div class="form-group">
+                    <label for="temp_high">Temperatura Alta (°C)</label>
+                    <input type="number" id="temp_high" name="power_management.thermal.threshold_high" min="50" max="80" value="70">
+                </div>
+
+                <div class="form-group">
+                    <label for="temp_critical">Temperatura Crítica (°C)</label>
+                    <input type="number" id="temp_critical" name="power_management.thermal.threshold_critical" min="60" max="90" value="80">
+                </div>
+
+                <div class="status-card">
+                    <h3>Status de Energia</h3>
+                    <div id="power-stats">
+                        <p>Modo Atual: <span id="power-current-mode">-</span></p>
+                        <p>Temperatura: <span id="power-temp">-</span></p>
+                        <p>Idle: <span id="power-idle">-</span></p>
+                    </div>
+                </div>
+            </section>
+
+            <!-- System Tab -->
+            <section id="tab-system" class="tab-content">
+                <h2>Sistema</h2>
+
+                <div class="status-card">
+                    <h3>Informações do Sistema</h3>
+                    <div id="system-info">
+                        <p>Plataforma: <span id="sys-platform">-</span></p>
+                        <p>Hostname: <span id="sys-hostname">-</span></p>
+                        <p>CPU Temp: <span id="sys-temp">-</span></p>
+                        <p>Memória: <span id="sys-memory">-</span></p>
+                        <p>Disco: <span id="sys-disk">-</span></p>
+                    </div>
+                    <button type="button" id="btn-refresh-system" class="btn btn-secondary">🔄 Atualizar</button>
+                </div>
+
+                <div class="form-group">
+                    <label for="log_level">Nível de Log</label>
+                    <select id="log_level" name="system.log_level">
+                        <option value="DEBUG">Debug</option>
+                        <option value="INFO">Info</option>
+                        <option value="WARNING">Warning</option>
+                        <option value="ERROR">Error</option>
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="timeout">Timeout de Processamento (s)</label>
+                    <input type="number" id="timeout" name="system.timeout" min="30" max="300" value="60">
+                </div>
+
+                <div class="form-group">
+                    <h3>Ações</h3>
+                    <button type="button" id="btn-export" class="btn btn-secondary">📤 Exportar Config</button>
+                    <button type="button" id="btn-import" class="btn btn-secondary">📥 Importar Config</button>
+                    <button type="button" id="btn-reset" class="btn btn-danger">🔄 Resetar Padrões</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Footer Actions -->
+        <footer class="footer">
+            <button type="button" id="btn-save" class="btn btn-primary">💾 Salvar Configurações</button>
+            <button type="button" id="btn-reload" class="btn btn-secondary">↩️ Recarregar</button>
+            <span id="save-status"></span>
+        </footer>
+    </div>
+
+    <script src="/static/js/app.js"></script>
+</body>
+</html>

@@ -242,3 +242,30 @@ power_management:
       disable_hdmi: true
       disable_bluetooth: true
       led_brightness: 0
+
+# =============================================================================
+# Interface Web (Feature Toggle)
+# =============================================================================
+web_interface:
+  # *** FEATURE TOGGLE - Habilitar interface web ***
+  enabled: false
+
+  # Host e porta do servidor
+  host: "0.0.0.0"
+  port: 8080
+
+  # Modo debug (não usar em produção)
+  debug: false
+
+  # Autenticação básica (opcional)
+  auth:
+    enabled: false
+    username: "admin"
+    # Senha hash - gere com: python -c "import hashlib; print(hashlib.sha256(b'sua_senha').hexdigest())"
+    password_hash: ""
+
+  # CORS (para acesso de outros dispositivos)
+  cors_enabled: true
+
+  # Rate limiting (requisições por minuto)
+  rate_limit: 60
