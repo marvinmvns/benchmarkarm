@@ -222,37 +222,57 @@ class ContinuousListener:
         
         logger.info(f"📝 Processando áudio: {audio.duration:.1f}s")
         
-        # Salvar áudio se configurado
+        # Nome do arquivo para salvar
+        filename = f"audio_{timestamp.strftime('%Y%m%d_%H%M%S')}.wav"
+        audio_file_path = str(self._save_dir / filename)
+        
+        # Sempre salvar áudio primeiro (para garantir que não se perca)
+        # Será removido pelo batch_processor após transcrição bem sucedida
         audio_file = None
-        if self.usb_config.keep_original_audio:
-            filename = f"audio_{timestamp.strftime('%Y%m%d_%H%M%S')}.wav"
-            audio_file = str(self._save_dir / filename)
-            audio.save(audio_file)
+        try:
+            audio.save(audio_file_path)
+            audio_file = audio_file_path
             logger.debug(f"Áudio salvo: {audio_file}")
+        except Exception as e:
+            logger.error(f"Erro ao salvar áudio: {e}")
         
         # Transcrever
         text = ""
         summary = None
+        transcription_success = False
         
         if self.usb_config.auto_transcribe:
             try:
                 processor = self._get_processor()
                 transcription = processor.transcribe(audio)
                 text = transcription.text
-                logger.info(f"✅ Transcrição: {text[:100]}...")
+                transcription_success = True
+                logger.info(f"✅ Transcrição: {text[:100]}..." if len(text) > 100 else f"✅ Transcrição: {text}")
                 
-                # Gerar resumo
+                # Gerar resumo (opcional - não falha processamento se der erro)
                 if self.usb_config.auto_summarize and text.strip() and processor.llm:
                     try:
                         response = processor.summarize(text)
                         summary = response.text
-                        logger.info(f"📋 Resumo: {summary[:100]}...")
+                        logger.info(f"📋 Resumo: {summary[:100]}..." if len(summary) > 100 else f"📋 Resumo: {summary}")
                     except Exception as e:
-                        logger.warning(f"Erro ao gerar resumo: {e}")
+                        logger.warning(f"⚠️ Erro ao gerar resumo (sem internet ou LLM indisponível): {e}")
+                        # Continua sem resumo - transcrição já foi salva
+                
+                # Transcrição bem sucedida - remover .wav se não precisar manter
+                if transcription_success and audio_file and not self.usb_config.keep_original_audio:
+                    try:
+                        Path(audio_file).unlink()
+                        audio_file = None
+                        logger.debug("Áudio temporário removido após transcrição")
+                    except Exception:
+                        pass
                 
             except Exception as e:
-                logger.error(f"Erro na transcrição: {e}")
+                logger.error(f"❌ Erro na transcrição: {e}")
                 text = f"[Erro na transcrição: {e}]"
+                # Áudio permanece salvo para processamento posterior pelo batch_processor
+                logger.info("📂 Áudio mantido para reprocessamento posterior")
         
         processing_time = time.time() - start_time
         
