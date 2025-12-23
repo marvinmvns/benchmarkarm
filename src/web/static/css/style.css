@@ -1330,3 +1330,227 @@ input[type="checkbox"] {
         width: 100%;
     }
 }
+
+/* ==========================================================================
+   Logs Tab Styles
+   ========================================================================== */
+
+/* Logs Stats */
+.logs-stats {
+    display: flex;
+    gap: 24px;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.stat-label {
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+.stat-value {
+    font-weight: 600;
+    font-size: 1.25rem;
+}
+
+.stat-value.error {
+    color: var(--danger);
+}
+
+.stat-value.warning {
+    color: var(--warning);
+}
+
+/* Logs Controls */
+.logs-controls {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.logs-filters {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.logs-filters select,
+.logs-filters input {
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    background: var(--bg-card);
+    color: var(--text);
+    font-size: 0.875rem;
+}
+
+.logs-filters input[type="number"] {
+    width: 80px;
+}
+
+.logs-actions {
+    display: flex;
+    gap: 8px;
+}
+
+/* Logs Container */
+.logs-container {
+    background: var(--bg-card);
+    border-radius: 12px;
+    padding: 16px;
+    box-shadow: var(--shadow);
+}
+
+.logs-list {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+/* Log Entry */
+.log-entry {
+    background: var(--bg);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    border-left: 3px solid var(--border);
+    font-family: monospace;
+    font-size: 0.8rem;
+}
+
+.log-entry:last-child {
+    margin-bottom: 0;
+}
+
+.log-entry.debug {
+    border-left-color: #6b7280;
+}
+
+.log-entry.info {
+    border-left-color: var(--primary);
+}
+
+.log-entry.warning {
+    border-left-color: var(--warning);
+    background: rgba(245, 158, 11, 0.05);
+}
+
+.log-entry.error,
+.log-entry.critical {
+    border-left-color: var(--danger);
+    background: rgba(239, 68, 68, 0.05);
+}
+
+.log-header {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    margin-bottom: 6px;
+    flex-wrap: wrap;
+}
+
+.log-level {
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-weight: 600;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+}
+
+.log-level.debug {
+    background: #6b7280;
+    color: white;
+}
+
+.log-level.info {
+    background: var(--primary);
+    color: white;
+}
+
+.log-level.warning {
+    background: var(--warning);
+    color: #1a1a1a;
+}
+
+.log-level.error,
+.log-level.critical {
+    background: var(--danger);
+    color: white;
+}
+
+.log-time {
+    color: var(--text-muted);
+    font-size: 0.75rem;
+}
+
+.log-logger {
+    color: var(--text-muted);
+    font-size: 0.7rem;
+    font-style: italic;
+}
+
+.log-message {
+    color: var(--text);
+    line-height: 1.4;
+    word-break: break-word;
+}
+
+.log-exception {
+    margin-top: 8px;
+    padding: 8px;
+    background: rgba(239, 68, 68, 0.1);
+    border-radius: 4px;
+    font-size: 0.75rem;
+    overflow-x: auto;
+    white-space: pre-wrap;
+    color: var(--danger);
+}
+
+/* Logs Footer */
+.logs-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.toggle-label {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+}
+
+.toggle-label input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+}
+
+/* Responsive */
+@media (max-width: 640px) {
+    .logs-controls {
+        flex-direction: column;
+        align-items: stretch;
+    }
+
+    .logs-filters,
+    .logs-actions {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .logs-stats {
+        gap: 16px;
+    }
+}

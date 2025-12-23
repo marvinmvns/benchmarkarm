@@ -1557,6 +1557,149 @@ async function checkAutoStart() {
 }
 
 // ==========================================================================
+// Logs Tab
+// ==========================================================================
+
+let logsAutoRefreshInterval = null;
+
+async function loadLogs(errorsOnly = false) {
+    try {
+        const level = errorsOnly ? 'ERROR' : ($('#logs-level-filter')?.value || '');
+        const limit = parseInt($('#logs-limit')?.value || 100);
+
+        const url = errorsOnly
+            ? `logs/errors?limit=${limit}`
+            : `logs?level=${level}&limit=${limit}`;
+
+        const result = await apiGet(url);
+
+        if (result.success) {
+            if (errorsOnly) {
+                renderLogs(result.errors || []);
+            } else {
+                renderLogs(result.logs || []);
+                updateLogStats(result.stats);
+            }
+
+            // Atualizar timestamp
+            const now = new Date().toLocaleTimeString('pt-BR');
+            const updateEl = $('#logs-last-update');
+            if (updateEl) updateEl.textContent = `Atualizado: ${now}`;
+        }
+    } catch (error) {
+        console.error('Erro ao carregar logs:', error);
+        $('#logs-list').innerHTML = '<p class="empty-message">Erro ao carregar logs</p>';
+    }
+}
+
+function updateLogStats(stats) {
+    if (!stats) return;
+
+    const totalEl = $('#logs-total');
+    const errorsEl = $('#logs-errors');
+    const warningsEl = $('#logs-warnings');
+
+    if (totalEl) totalEl.textContent = stats.total || 0;
+    if (errorsEl) errorsEl.textContent = stats.errors || 0;
+    if (warningsEl) warningsEl.textContent = stats.warnings || 0;
+}
+
+function renderLogs(logs) {
+    const container = $('#logs-list');
+    if (!container) return;
+
+    if (!logs || logs.length === 0) {
+        container.innerHTML = '<p class="empty-message">Nenhum log encontrado</p>';
+        return;
+    }
+
+    container.innerHTML = logs.map(log => {
+        const levelClass = log.level?.toLowerCase() || 'info';
+        const timestamp = log.timestamp ? new Date(log.timestamp).toLocaleString('pt-BR') : '';
+
+        return `
+            <div class="log-entry ${levelClass}">
+                <div class="log-header">
+                    <span class="log-level ${levelClass}">${log.level}</span>
+                    <span class="log-time">${timestamp}</span>
+                    <span class="log-logger">${log.logger || ''}</span>
+                </div>
+                <div class="log-message">${escapeHtml(log.raw_message || log.message || '')}</div>
+                ${log.exception ? `<pre class="log-exception">${escapeHtml(log.exception)}</pre>` : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+function escapeHtml(text) {
+    const div = document.createElement('div');
+    div.textContent = text;
+    return div.innerHTML;
+}
+
+async function clearLogs() {
+    if (!confirm('Limpar todos os logs em memória?')) return;
+
+    try {
+        const result = await apiPost('logs/clear');
+        if (result.success) {
+            showToast('Logs limpos!', 'success');
+            loadLogs();
+        }
+    } catch (error) {
+        console.error('Erro ao limpar logs:', error);
+        showToast('Erro ao limpar logs', 'error');
+    }
+}
+
+function toggleLogsAutoRefresh() {
+    const checkbox = $('#logs-auto-refresh');
+
+    if (checkbox?.checked) {
+        logsAutoRefreshInterval = setInterval(loadLogs, 5000);
+        showToast('Auto-refresh ativado', 'info');
+    } else {
+        if (logsAutoRefreshInterval) {
+            clearInterval(logsAutoRefreshInterval);
+            logsAutoRefreshInterval = null;
+        }
+    }
+}
+
+function initLogsTab() {
+    const refreshBtn = $('#btn-refresh-logs');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', () => loadLogs());
+    }
+
+    const errorsBtn = $('#btn-errors-only');
+    if (errorsBtn) {
+        errorsBtn.addEventListener('click', () => loadLogs(true));
+    }
+
+    const clearBtn = $('#btn-clear-logs');
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearLogs);
+    }
+
+    const levelFilter = $('#logs-level-filter');
+    if (levelFilter) {
+        levelFilter.addEventListener('change', () => loadLogs());
+    }
+
+    const autoRefresh = $('#logs-auto-refresh');
+    if (autoRefresh) {
+        autoRefresh.addEventListener('change', toggleLogsAutoRefresh);
+    }
+
+    // Carregar logs quando a aba for aberta
+    const logsTabBtn = document.querySelector('[data-tab="logs"]');
+    if (logsTabBtn) {
+        logsTabBtn.addEventListener('click', () => loadLogs());
+    }
+}
+
+// ==========================================================================
 // Init
 // ==========================================================================
 
@@ -1566,6 +1709,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTranscriptionListeners();
     initListenerControls();
     initFilesTab();
+    initLogsTab();
     loadConfig();
 
     // Check auto-start after config is loaded

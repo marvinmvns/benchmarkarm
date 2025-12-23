@@ -7,12 +7,123 @@ import json
 import logging
 import os
 import threading
+from collections import deque
+from datetime import datetime
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List, Dict
 
 import yaml
 
 logger = logging.getLogger(__name__)
+
+
+class MemoryLogHandler(logging.Handler):
+    """Handler que armazena logs em memória para exibição na interface web."""
+    
+    _instance = None
+    _lock = threading.Lock()
+    
+    def __new__(cls, max_entries: int = 500):
+        if cls._instance is None:
+            with cls._lock:
+                if cls._instance is None:
+                    cls._instance = super().__new__(cls)
+                    cls._instance._initialized = False
+        return cls._instance
+    
+    def __init__(self, max_entries: int = 500):
+        if self._initialized:
+            return
+        super().__init__()
+        self.log_entries: deque = deque(maxlen=max_entries)
+        self.error_count = 0
+        self.warning_count = 0
+        self._initialized = True
+        
+        # Formatar logs
+        self.setFormatter(logging.Formatter(
+            '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        ))
+    
+    def emit(self, record: logging.LogRecord):
+        try:
+            entry = {
+                "timestamp": datetime.fromtimestamp(record.created).isoformat(),
+                "level": record.levelname,
+                "logger": record.name,
+                "message": self.format(record),
+                "raw_message": record.getMessage(),
+            }
+            
+            # Adicionar info de exceção se houver
+            if record.exc_info:
+                import traceback
+                entry["exception"] = ''.join(traceback.format_exception(*record.exc_info))
+            
+            self.log_entries.append(entry)
+            
+            # Contadores
+            if record.levelno >= logging.ERROR:
+                self.error_count += 1
+            elif record.levelno >= logging.WARNING:
+                self.warning_count += 1
+                
+        except Exception:
+            self.handleError(record)
+    
+    def get_logs(self, level: str = None, limit: int = 100, logger_filter: str = None) -> List[Dict]:
+        """Retorna logs filtrados."""
+        logs = list(self.log_entries)
+        
+        # Filtrar por level
+        if level:
+            level_upper = level.upper()
+            logs = [l for l in logs if l["level"] == level_upper]
+        
+        # Filtrar por logger
+        if logger_filter:
+            logs = [l for l in logs if logger_filter in l["logger"]]
+        
+        # Retornar mais recentes primeiro (limitado)
+        return list(reversed(logs))[:limit]
+    
+    def get_errors(self, limit: int = 50) -> List[Dict]:
+        """Retorna apenas erros."""
+        logs = list(self.log_entries)
+        errors = [l for l in logs if l["level"] in ("ERROR", "CRITICAL")]
+        return list(reversed(errors))[:limit]
+    
+    def clear(self):
+        """Limpa os logs."""
+        self.log_entries.clear()
+        self.error_count = 0
+        self.warning_count = 0
+    
+    def get_stats(self) -> Dict:
+        """Retorna estatísticas dos logs."""
+        return {
+            "total": len(self.log_entries),
+            "errors": self.error_count,
+            "warnings": self.warning_count,
+        }
+
+
+def setup_memory_logging():
+    """Configura o handler de memória no logger raiz."""
+    handler = MemoryLogHandler()
+    handler.setLevel(logging.DEBUG)
+    
+    # Adicionar ao logger raiz
+    root_logger = logging.getLogger()
+    
+    # Evitar duplicatas
+    for h in root_logger.handlers:
+        if isinstance(h, MemoryLogHandler):
+            return handler
+    
+    root_logger.addHandler(handler)
+    return handler
+
 
 # Tentar importar Flask, fallback para servidor básico
 try:
@@ -54,6 +165,10 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
 
     app.config["CONFIG_PATH"] = config_path
     app.config["SECRET_KEY"] = os.urandom(24)
+    
+    # Configurar captura de logs em memória
+    log_handler = setup_memory_logging()
+    logger.info("🌐 Servidor web iniciado")
 
     # ==========================================================================
     # Funções auxiliares
@@ -965,6 +1080,91 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
                 "results": results,
                 "total": len(results),
             })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # ==========================================================================
+    # Logs da Aplicação
+    # ==========================================================================
+
+    @app.route("/api/logs", methods=["GET"])
+    def get_logs():
+        """Retorna logs da aplicação."""
+        try:
+            level = request.args.get("level")  # DEBUG, INFO, WARNING, ERROR
+            limit = request.args.get("limit", 100, type=int)
+            logger_filter = request.args.get("logger")
+            
+            logs = log_handler.get_logs(level=level, limit=limit, logger_filter=logger_filter)
+            stats = log_handler.get_stats()
+            
+            return jsonify({
+                "success": True,
+                "logs": logs,
+                "stats": stats,
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/logs/errors", methods=["GET"])
+    def get_errors():
+        """Retorna apenas erros."""
+        try:
+            limit = request.args.get("limit", 50, type=int)
+            errors = log_handler.get_errors(limit=limit)
+            
+            return jsonify({
+                "success": True,
+                "errors": errors,
+                "count": len(errors),
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/logs/stats", methods=["GET"])
+    def get_log_stats():
+        """Retorna estatísticas de logs."""
+        try:
+            stats = log_handler.get_stats()
+            return jsonify({
+                "success": True,
+                **stats,
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/logs/clear", methods=["POST"])
+    def clear_logs():
+        """Limpa os logs em memória."""
+        try:
+            log_handler.clear()
+            logger.info("📋 Logs limpos via interface")
+            return jsonify({
+                "success": True,
+                "message": "Logs limpos",
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/logs/test", methods=["POST"])
+    def test_log():
+        """Gera log de teste."""
+        try:
+            level = request.json.get("level", "info").upper()
+            message = request.json.get("message", "Mensagem de teste")
+            
+            if level == "DEBUG":
+                logger.debug(message)
+            elif level == "INFO":
+                logger.info(message)
+            elif level == "WARNING":
+                logger.warning(message)
+            elif level == "ERROR":
+                logger.error(message)
+            elif level == "CRITICAL":
+                logger.critical(message)
+            
+            return jsonify({"success": True, "message": f"Log {level} registrado"})
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 

@@ -30,6 +30,7 @@
             <button class="tab-btn" data-tab="power">Energia</button>
             <button class="tab-btn" data-tab="usb-receiver">🎧 Escuta Contínua</button>
             <button class="tab-btn" data-tab="files">📂 Arquivos</button>
+            <button class="tab-btn" data-tab="logs">📋 Logs</button>
             <button class="tab-btn" data-tab="system">Sistema</button>
             <button class="tab-btn" data-tab="transcription">📝 Transcrição</button>
         </nav>
@@ -858,6 +859,73 @@
                     </div>
                 </div>
             </div>
+
+            <!-- Logs Tab -->
+            <section id="tab-logs" class="tab-content">
+                <h2>📋 Logs da Aplicação</h2>
+
+                <!-- Stats -->
+                <div class="status-card">
+                    <h3>📊 Estatísticas</h3>
+                    <div class="logs-stats">
+                        <span class="stat-item">
+                            <span class="stat-label">Total:</span>
+                            <span id="logs-total" class="stat-value">0</span>
+                        </span>
+                        <span class="stat-item">
+                            <span class="stat-label">Erros:</span>
+                            <span id="logs-errors" class="stat-value error">0</span>
+                        </span>
+                        <span class="stat-item">
+                            <span class="stat-label">Avisos:</span>
+                            <span id="logs-warnings" class="stat-value warning">0</span>
+                        </span>
+                    </div>
+                </div>
+
+                <!-- Controls -->
+                <div class="logs-controls">
+                    <div class="logs-filters">
+                        <select id="logs-level-filter">
+                            <option value="">Todos os níveis</option>
+                            <option value="DEBUG">DEBUG</option>
+                            <option value="INFO">INFO</option>
+                            <option value="WARNING">WARNING</option>
+                            <option value="ERROR">ERROR</option>
+                            <option value="CRITICAL">CRITICAL</option>
+                        </select>
+                        <input type="number" id="logs-limit" value="100" min="10" max="500" placeholder="Limite">
+                    </div>
+                    <div class="logs-actions">
+                        <button class="btn btn-small" id="btn-refresh-logs">🔄 Atualizar</button>
+                        <button class="btn btn-small" id="btn-errors-only">❌ Só Erros</button>
+                        <button class="btn btn-small btn-danger" id="btn-clear-logs">🗑️ Limpar</button>
+                    </div>
+                </div>
+
+                <!-- Info Box -->
+                <div class="info-box">
+                    <p>💡 Os logs são armazenados em memória (últimos 500 registros). Use os filtros para encontrar
+                        erros ou informações específicas.</p>
+                </div>
+
+                <!-- Logs List -->
+                <div class="logs-container">
+                    <div id="logs-list" class="logs-list">
+                        <p class="empty-message">Carregando logs...</p>
+                    </div>
+                </div>
+
+                <!-- Auto-refresh toggle -->
+                <div class="logs-footer">
+                    <label class="toggle-label">
+                        <input type="checkbox" id="logs-auto-refresh">
+                        Auto-atualizar (5s)
+                    </label>
+                    <span id="logs-last-update">-</span>
+                </div>
+            </section>
+
         </main>
 
         <!-- Footer Actions -->
