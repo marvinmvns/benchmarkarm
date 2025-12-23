@@ -143,48 +143,95 @@ if [ -f "$OVERLAYS_DIR/${OVERLAY_NAME}.dtbo" ]; then
 fi
 
 if [ "$SKIP_COMPILE" != "true" ]; then
-    log_info "Baixando overlays oficiais da Seeed..."
+    log_info "Baixando overlays..."
 
     rm -rf "$OVERLAY_DIR"
-    git clone --depth 1 https://github.com/Seeed-Studio/seeed-linux-dtoverlays.git "$OVERLAY_DIR"
-
-    cd "$OVERLAY_DIR/overlays/rpi"
-
-    # Verificar se o arquivo DTS existe
-    if [ ! -f "$OVERLAY_DTS" ]; then
-        log_warn "Arquivo $OVERLAY_DTS não encontrado!"
-        log_info "Tentando alternativas..."
-
-        # Listar arquivos disponíveis
-        ls -la *.dts 2>/dev/null | head -10
-
-        # Tentar encontrar alternativa
-        if [ -f "respeaker-2mic-v2_0-overlay.dts" ]; then
-            OVERLAY_DTS="respeaker-2mic-v2_0-overlay.dts"
-            OVERLAY_NAME="respeaker-2mic-v2_0"
-        elif [ -f "seeed-2mic-voicecard-overlay.dts" ]; then
-            OVERLAY_DTS="seeed-2mic-voicecard-overlay.dts"
-            OVERLAY_NAME="seeed-2mic-voicecard"
+    
+    # Tentar repositório oficial Seeed primeiro
+    if git clone --depth 1 https://github.com/Seeed-Studio/seeed-linux-dtoverlays.git "$OVERLAY_DIR" 2>/dev/null; then
+        log_success "Usando repositório oficial Seeed"
+        OVERLAY_SRC="$OVERLAY_DIR/overlays/rpi"
+    else
+        log_warn "Repositório oficial falhou. Tentando fork HinTak..."
+        
+        # Fallback: Fork HinTak (melhor suporte para kernels novos)
+        if git clone --depth 1 https://github.com/HinTak/seeed-voicecard.git "$OVERLAY_DIR" 2>/dev/null; then
+            log_success "Usando fork HinTak/seeed-voicecard"
+            OVERLAY_SRC="$OVERLAY_DIR"
+            
+            # O HinTak tem instalador próprio
+            log_info "Executando instalador do HinTak..."
+            cd "$OVERLAY_DIR"
+            
+            if sudo ./install.sh 2mic 2>/dev/null || sudo ./install.sh; then
+                log_success "Driver instalado via HinTak/seeed-voicecard"
+                SKIP_COMPILE=true
+                OVERLAY_INSTALLED=true
+            else
+                log_warn "Instalador falhou, tentando compilação manual..."
+            fi
         else
-            log_error "Nenhum overlay compatível encontrado!"
+            log_error "Falha ao baixar overlays! Verifique sua conexão."
             exit 1
         fi
-        log_info "Usando: $OVERLAY_DTS"
     fi
 
-    log_info "Compilando overlay: $OVERLAY_DTS"
-    dtc -@ -I dts -O dtb -o "${OVERLAY_NAME}.dtbo" "$OVERLAY_DTS" 2>/dev/null || \
-    dtc -I dts -O dtb -o "${OVERLAY_NAME}.dtbo" "$OVERLAY_DTS"
+    if [ "$SKIP_COMPILE" != "true" ]; then
+        cd "$OVERLAY_SRC"
 
-    if [ ! -f "${OVERLAY_NAME}.dtbo" ]; then
-        log_error "Falha ao compilar overlay!"
-        exit 1
+        # Verificar se o arquivo DTS existe
+        if [ ! -f "$OVERLAY_DTS" ]; then
+            log_warn "Arquivo $OVERLAY_DTS não encontrado!"
+            log_info "Tentando alternativas..."
+
+            # Listar arquivos disponíveis
+            ls -la *.dts 2>/dev/null | head -10
+
+            # Tentar encontrar alternativa
+            if [ -f "respeaker-2mic-v2_0-overlay.dts" ]; then
+                OVERLAY_DTS="respeaker-2mic-v2_0-overlay.dts"
+                OVERLAY_NAME="respeaker-2mic-v2_0"
+            elif [ -f "seeed-2mic-voicecard-overlay.dts" ]; then
+                OVERLAY_DTS="seeed-2mic-voicecard-overlay.dts"
+                OVERLAY_NAME="seeed-2mic-voicecard"
+            elif [ -f "seeed-2mic-voicecard.dts" ]; then
+                OVERLAY_DTS="seeed-2mic-voicecard.dts"
+                OVERLAY_NAME="seeed-2mic-voicecard"
+            else
+                log_error "Nenhum overlay compatível encontrado!"
+                log_info "Tentando instalação via fork HinTak..."
+                
+                # Última tentativa: usar HinTak diretamente
+                rm -rf "$OVERLAY_DIR"
+                git clone --depth 1 https://github.com/HinTak/seeed-voicecard.git "$OVERLAY_DIR"
+                cd "$OVERLAY_DIR"
+                sudo ./install.sh 2mic || sudo ./install.sh || {
+                    log_error "Todas as tentativas de instalação falharam!"
+                    exit 1
+                }
+                log_success "Instalado via HinTak/seeed-voicecard"
+                SKIP_COMPILE=true
+                OVERLAY_INSTALLED=true
+            fi
+            log_info "Usando: $OVERLAY_DTS"
+        fi
+
+        if [ "$SKIP_COMPILE" != "true" ]; then
+            log_info "Compilando overlay: $OVERLAY_DTS"
+            dtc -@ -I dts -O dtb -o "${OVERLAY_NAME}.dtbo" "$OVERLAY_DTS" 2>/dev/null || \
+            dtc -I dts -O dtb -o "${OVERLAY_NAME}.dtbo" "$OVERLAY_DTS"
+
+            if [ ! -f "${OVERLAY_NAME}.dtbo" ]; then
+                log_error "Falha ao compilar overlay!"
+                exit 1
+            fi
+
+            log_info "Instalando overlay em $OVERLAYS_DIR"
+            sudo cp "${OVERLAY_NAME}.dtbo" "$OVERLAYS_DIR/"
+
+            log_success "Overlay compilado e instalado!"
+        fi
     fi
-
-    log_info "Instalando overlay em $OVERLAYS_DIR"
-    sudo cp "${OVERLAY_NAME}.dtbo" "$OVERLAYS_DIR/"
-
-    log_success "Overlay compilado e instalado!"
 fi
 
 # =============================================================================
