@@ -394,26 +394,31 @@ if [ ! -d "$WHISPER_CPP_DIR" ]; then
     git clone --depth 1 https://github.com/ggerganov/whisper.cpp.git "$WHISPER_CPP_DIR"
     cd "$WHISPER_CPP_DIR"
 
-    # Compilar com otimizações para ARM
+    # Compilar com cmake (versão moderna do whisper.cpp)
     if $IS_PI; then
         log_info "Compilando whisper.cpp para ARM..."
+        mkdir -p build && cd build
         if $IS_PI_ZERO; then
             # Pi Zero 2W - Cortex-A53
-            make clean
-            CFLAGS="-mcpu=cortex-a53 -mfpu=neon-fp-armv8 -O3" make -j2
+            cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-mcpu=cortex-a53 -O3" -DCMAKE_CXX_FLAGS="-mcpu=cortex-a53 -O3"
+            make -j2
         else
             # Pi 3/4/5
-            make clean
-            CFLAGS="-O3" make -j4
+            cmake .. -DCMAKE_BUILD_TYPE=Release
+            make -j4
         fi
+        cd ..
     else
+        mkdir -p build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
         make -j$(nproc)
+        cd ..
     fi
 
     # Baixar modelo tiny
     if ! $SKIP_MODELS; then
         log_info "Baixando modelo Whisper tiny..."
-        bash models/download-ggml-model.sh tiny
+        bash models/download-ggml-model.sh tiny || log_warn "Falha ao baixar modelo, você pode baixar manualmente"
     fi
 
     cd "$PROJECT_DIR"
@@ -429,17 +434,23 @@ if [ ! -d "$LLAMA_CPP_DIR" ]; then
     git clone --depth 1 https://github.com/ggerganov/llama.cpp.git "$LLAMA_CPP_DIR"
     cd "$LLAMA_CPP_DIR"
 
+    # Compilar com cmake (versão moderna do llama.cpp)
     if $IS_PI; then
         log_info "Compilando llama.cpp para ARM..."
+        mkdir -p build && cd build
         if $IS_PI_ZERO; then
-            make clean
-            CFLAGS="-mcpu=cortex-a53 -O3" make -j2
+            cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-mcpu=cortex-a53 -O3" -DCMAKE_CXX_FLAGS="-mcpu=cortex-a53 -O3"
+            make -j2
         else
-            make clean
+            cmake .. -DCMAKE_BUILD_TYPE=Release
             make -j4
         fi
+        cd ..
     else
+        mkdir -p build && cd build
+        cmake .. -DCMAKE_BUILD_TYPE=Release
         make -j$(nproc)
+        cd ..
     fi
 
     cd "$PROJECT_DIR"
