@@ -139,6 +139,32 @@ class HardwareConfig:
 
 
 @dataclass
+class USBReceiverConfig:
+    """
+    Configuração do modo USB Receiver (Placa de Som USB).
+    
+    Transforma o Raspberry Pi em uma placa de som USB que recebe
+    áudio de dispositivos externos, armazena e processa automaticamente.
+    
+    Por padrão, a aplicação escuta e transcreve tudo automaticamente.
+    """
+    enabled: bool = True                            # Habilitado por padrão
+    save_directory: str = "~/audio-recordings"      # Diretório para salvar gravações
+    auto_transcribe: bool = True                    # Transcrever automaticamente
+    auto_summarize: bool = True                     # Gerar resumo automaticamente
+    min_audio_duration: float = 3.0                 # Duração mínima para processar (segundos)
+    max_audio_duration: float = 300.0               # Duração máxima (5 minutos)
+    silence_split: bool = True                      # Dividir gravação por silêncio
+    silence_threshold: float = 2.0                  # Segundos de silêncio para dividir
+    sample_rate: int = 44100                        # Taxa de amostragem USB (CD quality)
+    channels: int = 2                               # Stereo para compatibilidade USB
+    process_on_disconnect: bool = True              # Processar quando USB desconectar
+    keep_original_audio: bool = True                # Manter arquivo original após processar
+    continuous_listen: bool = True                  # Escuta contínua por padrão
+    usb_gadget_enabled: bool = False                # USB Gadget desabilitado por padrão (requer setup)
+
+
+@dataclass
 class Config:
     """Configuração principal do Voice Processor."""
     mode: str = "hybrid"
@@ -148,6 +174,7 @@ class Config:
     prompts: PromptsConfig = field(default_factory=PromptsConfig)
     system: SystemConfig = field(default_factory=SystemConfig)
     hardware: HardwareConfig = field(default_factory=HardwareConfig)
+    usb_receiver: USBReceiverConfig = field(default_factory=USBReceiverConfig)
 
     @classmethod
     def from_dict(cls, data: dict) -> "Config":
@@ -193,6 +220,9 @@ class Config:
         hardware_data = data.get("hardware", {})
         hardware = HardwareConfig(**{k: v for k, v in hardware_data.items() if k in HardwareConfig.__dataclass_fields__})
 
+        usb_receiver_data = data.get("usb_receiver", {})
+        usb_receiver = USBReceiverConfig(**{k: v for k, v in usb_receiver_data.items() if k in USBReceiverConfig.__dataclass_fields__})
+
         return cls(
             mode=data.get("mode", "hybrid"),
             audio=audio,
@@ -201,6 +231,7 @@ class Config:
             prompts=prompts,
             system=system,
             hardware=hardware,
+            usb_receiver=usb_receiver,
         )
 
 

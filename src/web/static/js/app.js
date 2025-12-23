@@ -186,6 +186,24 @@ function populateForm(cfg) {
             $('#temp_critical').value = cfg.power_management.thermal.threshold_critical || 80;
         }
     }
+
+    // USB Receiver / Escuta Contínua
+    if (cfg.usb_receiver) {
+        $('#usb_receiver_enabled').checked = cfg.usb_receiver.enabled !== false;
+        $('#usb_continuous_listen').checked = cfg.usb_receiver.continuous_listen !== false;
+        $('#usb_gadget_enabled').checked = cfg.usb_receiver.usb_gadget_enabled === true;
+        $('#usb_save_directory').value = cfg.usb_receiver.save_directory || '~/audio-recordings';
+        $('#usb_sample_rate').value = cfg.usb_receiver.sample_rate || 44100;
+        $('#usb_channels').value = cfg.usb_receiver.channels || 2;
+        $('#usb_max_duration').value = cfg.usb_receiver.max_audio_duration || 300;
+        $('#usb_auto_transcribe').checked = cfg.usb_receiver.auto_transcribe !== false;
+        $('#usb_auto_summarize').checked = cfg.usb_receiver.auto_summarize !== false;
+        $('#usb_min_duration').value = cfg.usb_receiver.min_audio_duration || 3;
+        $('#usb_silence_split').checked = cfg.usb_receiver.silence_split !== false;
+        $('#usb_silence_threshold').value = cfg.usb_receiver.silence_threshold || 2;
+        $('#usb_process_on_disconnect').checked = cfg.usb_receiver.process_on_disconnect !== false;
+        $('#usb_keep_original').checked = cfg.usb_receiver.keep_original_audio !== false;
+    }
 }
 
 function collectFormValues() {
@@ -245,6 +263,23 @@ function collectFormValues() {
     if (!config.power_management.thermal) config.power_management.thermal = {};
     config.power_management.thermal.threshold_high = parseFloat($('#temp_high').value);
     config.power_management.thermal.threshold_critical = parseFloat($('#temp_critical').value);
+
+    // USB Receiver / Escuta Contínua
+    if (!config.usb_receiver) config.usb_receiver = {};
+    config.usb_receiver.enabled = $('#usb_receiver_enabled').checked;
+    config.usb_receiver.continuous_listen = $('#usb_continuous_listen').checked;
+    config.usb_receiver.usb_gadget_enabled = $('#usb_gadget_enabled').checked;
+    config.usb_receiver.save_directory = $('#usb_save_directory').value;
+    config.usb_receiver.sample_rate = parseInt($('#usb_sample_rate').value);
+    config.usb_receiver.channels = parseInt($('#usb_channels').value);
+    config.usb_receiver.max_audio_duration = parseInt($('#usb_max_duration').value);
+    config.usb_receiver.auto_transcribe = $('#usb_auto_transcribe').checked;
+    config.usb_receiver.auto_summarize = $('#usb_auto_summarize').checked;
+    config.usb_receiver.min_audio_duration = parseFloat($('#usb_min_duration').value);
+    config.usb_receiver.silence_split = $('#usb_silence_split').checked;
+    config.usb_receiver.silence_threshold = parseFloat($('#usb_silence_threshold').value);
+    config.usb_receiver.process_on_disconnect = $('#usb_process_on_disconnect').checked;
+    config.usb_receiver.keep_original_audio = $('#usb_keep_original').checked;
 }
 
 // ==========================================================================
@@ -350,6 +385,10 @@ function initTabs() {
             if (btn.dataset.tab === 'offline') refreshQueueStats();
             if (btn.dataset.tab === 'power') refreshPowerStatus();
             if (btn.dataset.tab === 'transcription') refreshProcessorStatus();
+            if (btn.dataset.tab === 'usb-receiver') {
+                refreshListenerStatus();
+                refreshLiveTranscriptions();
+            }
         });
     });
 }
@@ -697,6 +736,328 @@ function initTranscriptionListeners() {
 }
 
 // ==========================================================================
+// Escuta Contínua
+// ==========================================================================
+
+let listenerStatusInterval = null;
+
+async function startListener() {
+    try {
+        const result = await apiPost('listener/start');
+        if (result.success) {
+            updateListenerUI(result.status);
+            startListenerStatusPolling();
+        } else {
+            alert(result.error || 'Erro ao iniciar escuta');
+        }
+    } catch (error) {
+        console.error('Erro ao iniciar listener:', error);
+        alert('Erro ao iniciar escuta contínua');
+    }
+}
+
+async function stopListener() {
+    try {
+        const result = await apiPost('listener/stop');
+        if (result.success) {
+            updateListenerUI(result.status);
+            stopListenerStatusPolling();
+        }
+    } catch (error) {
+        console.error('Erro ao parar listener:', error);
+    }
+}
+
+async function pauseListener() {
+    try {
+        const result = await apiPost('listener/pause');
+        if (result.success) {
+            updateListenerUI(result.status);
+        }
+    } catch (error) {
+        console.error('Erro ao pausar listener:', error);
+    }
+}
+
+async function resumeListener() {
+    try {
+        const result = await apiPost('listener/resume');
+        if (result.success) {
+            updateListenerUI(result.status);
+        }
+    } catch (error) {
+        console.error('Erro ao retomar listener:', error);
+    }
+}
+
+async function refreshListenerStatus() {
+    try {
+        const result = await apiGet('listener/status');
+        if (result.success) {
+            updateListenerUI(result.status);
+        }
+    } catch (error) {
+        console.error('Erro ao obter status do listener:', error);
+    }
+}
+
+async function refreshLiveTranscriptions() {
+    try {
+        const result = await apiGet('listener/segments?limit=10');
+        if (result.success) {
+            renderLiveTranscriptions(result.segments);
+        }
+    } catch (error) {
+        console.error('Erro ao obter transcrições:', error);
+    }
+}
+
+function updateListenerUI(status) {
+    const startBtn = $('#btn-listener-start');
+    const pauseBtn = $('#btn-listener-pause');
+    const stopBtn = $('#btn-listener-stop');
+    const stateEl = $('#listener-state');
+    const countEl = $('#listener-segments-count');
+
+    if (status.running) {
+        startBtn.disabled = true;
+        stopBtn.disabled = false;
+        pauseBtn.disabled = false;
+
+        if (status.paused) {
+            stateEl.textContent = 'Pausado';
+            stateEl.className = 'status-badge paused';
+            pauseBtn.textContent = '▶️ Retomar';
+        } else {
+            stateEl.textContent = 'Escutando';
+            stateEl.className = 'status-badge running';
+            pauseBtn.textContent = '⏸️ Pausar';
+        }
+    } else {
+        startBtn.disabled = false;
+        pauseBtn.disabled = true;
+        stopBtn.disabled = true;
+        stateEl.textContent = 'Parado';
+        stateEl.className = 'status-badge stopped';
+    }
+
+    countEl.textContent = status.segments_count || 0;
+}
+
+function startListenerStatusPolling() {
+    if (listenerStatusInterval) return;
+    listenerStatusInterval = setInterval(() => {
+        refreshListenerStatus();
+        refreshLiveTranscriptions();
+    }, 3000);
+}
+
+function stopListenerStatusPolling() {
+    if (listenerStatusInterval) {
+        clearInterval(listenerStatusInterval);
+        listenerStatusInterval = null;
+    }
+}
+
+// Armazenar segmentos para filtros
+let allSegments = [];
+
+function renderLiveTranscriptionsFiltered() {
+    const searchQuery = $('#transcription-search')?.value?.toLowerCase() || '';
+    const filterDuration = $('#filter-duration')?.value || '';
+    const filterWithSummary = $('#filter-with-summary')?.checked;
+
+    let filtered = allSegments;
+
+    // Filtro de busca
+    if (searchQuery) {
+        filtered = filtered.filter(seg =>
+            (seg.text && seg.text.toLowerCase().includes(searchQuery)) ||
+            (seg.summary && seg.summary.toLowerCase().includes(searchQuery))
+        );
+    }
+
+    // Filtro de duração
+    if (filterDuration) {
+        filtered = filtered.filter(seg => {
+            const dur = seg.audio_duration || 0;
+            if (filterDuration === 'short') return dur < 10;
+            if (filterDuration === 'medium') return dur >= 10 && dur <= 60;
+            if (filterDuration === 'long') return dur > 60;
+            return true;
+        });
+    }
+
+    // Filtro com resumo (mostrar todos, não apenas com resumo)
+    // Se desmarcado, não filtra
+
+    renderTranscriptionItems(filtered);
+    updateTranscriptionCount(filtered.length);
+}
+
+function renderTranscriptionItems(segments) {
+    const container = $('#live-transcriptions');
+
+    if (!segments || segments.length === 0) {
+        container.innerHTML = '<p class="empty-message">Nenhuma transcrição encontrada.</p>';
+        return;
+    }
+
+    container.innerHTML = segments.slice().reverse().map(seg => `
+        <div class="transcription-item" data-id="${seg.timestamp}">
+            <div class="timestamp">${new Date(seg.timestamp).toLocaleString('pt-BR')}</div>
+            <div class="text">${seg.text || '[Sem texto]'}</div>
+            ${seg.summary ? `<div class="summary">📋 ${seg.summary}</div>` : ''}
+            <div class="meta">
+                ⏱️ ${seg.audio_duration?.toFixed(1)}s | 
+                ⚡ ${seg.processing_time?.toFixed(1)}s
+                ${seg.audio_file ? `| 🎵 <a href="#" onclick="playAudio('${seg.audio_file}')">${seg.audio_file.split('/').pop()}</a>` : ''}
+            </div>
+        </div>
+    `).join('');
+}
+
+function updateTranscriptionCount(count) {
+    const countEl = $('#transcription-count');
+    if (countEl) {
+        countEl.textContent = `${count} transcrição${count !== 1 ? 'ões' : ''}`;
+    }
+}
+
+async function refreshLiveTranscriptions() {
+    try {
+        const result = await apiGet('listener/segments?limit=50');
+        if (result.success) {
+            allSegments = result.segments || [];
+            renderLiveTranscriptionsFiltered();
+        }
+    } catch (error) {
+        console.error('Erro ao obter transcrições:', error);
+    }
+}
+
+function exportTranscriptionsJSON() {
+    if (allSegments.length === 0) {
+        alert('Nenhuma transcrição para exportar');
+        return;
+    }
+
+    const data = JSON.stringify(allSegments, null, 2);
+    const blob = new Blob([data], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transcricoes_${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+function exportTranscriptionsTXT() {
+    if (allSegments.length === 0) {
+        alert('Nenhuma transcrição para exportar');
+        return;
+    }
+
+    const lines = allSegments.map(seg => {
+        const date = new Date(seg.timestamp).toLocaleString('pt-BR');
+        let txt = `[${date}] (${seg.audio_duration?.toFixed(1)}s)\n`;
+        txt += `${seg.text || '[Sem texto]'}\n`;
+        if (seg.summary) {
+            txt += `\n📋 Resumo: ${seg.summary}\n`;
+        }
+        txt += '\n---\n';
+        return txt;
+    }).join('\n');
+
+    const blob = new Blob([lines], { type: 'text/plain;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `transcricoes_${new Date().toISOString().split('T')[0]}.txt`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+async function clearAllSegments() {
+    if (!confirm('Limpar todas as transcrições?')) return;
+
+    try {
+        // Chamar API para limpar (se existir)
+        await apiPost('listener/stop');
+        allSegments = [];
+        renderLiveTranscriptionsFiltered();
+    } catch (error) {
+        console.error('Erro ao limpar:', error);
+    }
+}
+
+function initListenerControls() {
+    // Botões de controle
+    $('#btn-listener-start').addEventListener('click', startListener);
+    $('#btn-listener-stop').addEventListener('click', stopListener);
+
+    $('#btn-listener-pause').addEventListener('click', () => {
+        const pauseBtn = $('#btn-listener-pause');
+        if (pauseBtn.textContent.includes('Pausar')) {
+            pauseListener();
+        } else {
+            resumeListener();
+        }
+    });
+
+    $('#btn-refresh-transcriptions').addEventListener('click', refreshLiveTranscriptions);
+
+    // Filtros e busca
+    const searchInput = $('#transcription-search');
+    if (searchInput) {
+        searchInput.addEventListener('input', debounce(renderLiveTranscriptionsFiltered, 300));
+    }
+
+    const filterDuration = $('#filter-duration');
+    if (filterDuration) {
+        filterDuration.addEventListener('change', renderLiveTranscriptionsFiltered);
+    }
+
+    const filterSummary = $('#filter-with-summary');
+    if (filterSummary) {
+        filterSummary.addEventListener('change', renderLiveTranscriptionsFiltered);
+    }
+
+    // Exportação
+    const btnExportJSON = $('#btn-export-json');
+    if (btnExportJSON) {
+        btnExportJSON.addEventListener('click', exportTranscriptionsJSON);
+    }
+
+    const btnExportTXT = $('#btn-export-txt');
+    if (btnExportTXT) {
+        btnExportTXT.addEventListener('click', exportTranscriptionsTXT);
+    }
+
+    const btnClear = $('#btn-clear-segments');
+    if (btnClear) {
+        btnClear.addEventListener('click', clearAllSegments);
+    }
+
+    // Carregar status inicial
+    refreshListenerStatus();
+    refreshLiveTranscriptions();
+}
+
+// Debounce helper
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const later = () => {
+            clearTimeout(timeout);
+            func(...args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// ==========================================================================
 // Init
 // ==========================================================================
 
@@ -704,6 +1065,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initEventListeners();
     initTranscriptionListeners();
+    initListenerControls();
     loadConfig();
 
     // Auto-refresh system info every 30s

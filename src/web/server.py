@@ -241,6 +241,142 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             return jsonify({"error": str(e)}), 500
 
     # ==========================================================================
+    # Escuta Contínua - Controle
+    # ==========================================================================
+    
+    # Listener global
+    continuous_listener = None
+    
+    def get_continuous_listener():
+        """Obtém instância do listener."""
+        nonlocal continuous_listener
+        if continuous_listener is None:
+            try:
+                from ..audio.continuous_listener import ContinuousListener
+                continuous_listener = ContinuousListener(config_path=config_path)
+            except Exception as e:
+                logger.error(f"Erro ao criar listener: {e}")
+                return None
+        return continuous_listener
+
+    @app.route("/api/listener/status", methods=["GET"])
+    def listener_status():
+        """Retorna status do listener de escuta contínua."""
+        try:
+            listener = get_continuous_listener()
+            if listener:
+                return jsonify({
+                    "success": True,
+                    "status": listener.status,
+                })
+            else:
+                return jsonify({
+                    "success": True,
+                    "status": {
+                        "running": False,
+                        "paused": False,
+                        "segments_count": 0,
+                        "enabled": False,
+                        "error": "Módulos de áudio não disponíveis",
+                    }
+                })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/listener/start", methods=["POST"])
+    def listener_start():
+        """Inicia escuta contínua."""
+        try:
+            listener = get_continuous_listener()
+            if listener:
+                listener.start()
+                return jsonify({
+                    "success": True,
+                    "message": "Escuta contínua iniciada",
+                    "status": listener.status,
+                })
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": "Módulos de áudio não disponíveis. Execute no Raspberry Pi.",
+                }), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/listener/stop", methods=["POST"])
+    def listener_stop():
+        """Para escuta contínua."""
+        try:
+            listener = get_continuous_listener()
+            if listener:
+                listener.stop()
+                return jsonify({
+                    "success": True,
+                    "message": "Escuta contínua parada",
+                    "status": listener.status,
+                })
+            else:
+                return jsonify({"success": True, "message": "Listener não ativo"})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/listener/pause", methods=["POST"])
+    def listener_pause():
+        """Pausa escuta contínua."""
+        try:
+            listener = get_continuous_listener()
+            if listener and listener.is_running:
+                listener.pause()
+                return jsonify({
+                    "success": True,
+                    "message": "Escuta pausada",
+                    "status": listener.status,
+                })
+            else:
+                return jsonify({"success": False, "error": "Listener não está rodando"}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/listener/resume", methods=["POST"])
+    def listener_resume():
+        """Retoma escuta contínua."""
+        try:
+            listener = get_continuous_listener()
+            if listener and listener.is_running:
+                listener.resume()
+                return jsonify({
+                    "success": True,
+                    "message": "Escuta retomada",
+                    "status": listener.status,
+                })
+            else:
+                return jsonify({"success": False, "error": "Listener não está rodando"}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/listener/segments", methods=["GET"])
+    def listener_segments():
+        """Retorna segmentos transcritos pelo listener."""
+        try:
+            listener = get_continuous_listener()
+            limit = request.args.get("limit", 20, type=int)
+            if listener:
+                segments = [s.to_dict() for s in listener.get_segments(limit)]
+                return jsonify({
+                    "success": True,
+                    "segments": segments,
+                    "total": len(segments),
+                })
+            else:
+                return jsonify({
+                    "success": True,
+                    "segments": [],
+                    "total": 0,
+                })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # ==========================================================================
     # Transcrição - Novas Rotas
     # ==========================================================================
     

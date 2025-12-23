@@ -1,11 +1,13 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Voice Processor - Configuração</title>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
+
 <body>
     <div class="container">
         <!-- Header -->
@@ -25,6 +27,7 @@
             <button class="tab-btn" data-tab="llm">LLM</button>
             <button class="tab-btn" data-tab="offline">Offline</button>
             <button class="tab-btn" data-tab="power">Energia</button>
+            <button class="tab-btn" data-tab="usb-receiver">🎧 Escuta Contínua</button>
             <button class="tab-btn" data-tab="system">Sistema</button>
             <button class="tab-btn" data-tab="transcription">📝 Transcrição</button>
         </nav>
@@ -83,7 +86,8 @@
 
                 <div class="form-group">
                     <label for="silence_duration">Silêncio para Parar (segundos)</label>
-                    <input type="number" id="silence_duration" name="audio.silence_duration" min="0.5" max="10" step="0.5" value="2.0">
+                    <input type="number" id="silence_duration" name="audio.silence_duration" min="0.5" max="10"
+                        step="0.5" value="2.0">
                 </div>
 
                 <div class="form-group">
@@ -95,7 +99,8 @@
 
                 <div class="form-group">
                     <label for="vad_aggressiveness">Agressividade VAD</label>
-                    <input type="range" id="vad_aggressiveness" name="audio.vad.aggressiveness" min="0" max="3" value="2">
+                    <input type="range" id="vad_aggressiveness" name="audio.vad.aggressiveness" min="0" max="3"
+                        value="2">
                     <span id="vad_aggressiveness_value">2</span>
                     <small>0 = menos filtro, 3 = mais filtro de ruído</small>
                 </div>
@@ -176,11 +181,13 @@
                     </div>
                     <div class="form-group">
                         <label for="local_context_size">Contexto</label>
-                        <input type="number" id="local_context_size" name="llm.local.context_size" min="128" max="2048" value="512">
+                        <input type="number" id="local_context_size" name="llm.local.context_size" min="128" max="2048"
+                            value="512">
                     </div>
                     <div class="form-group">
                         <label for="local_max_tokens">Tokens Máximos</label>
-                        <input type="number" id="local_max_tokens" name="llm.local.max_tokens" min="50" max="500" value="150">
+                        <input type="number" id="local_max_tokens" name="llm.local.max_tokens" min="50" max="500"
+                            value="150">
                     </div>
                 </div>
 
@@ -200,7 +207,8 @@
 
                 <div class="form-group">
                     <label for="llm_temperature">Temperatura</label>
-                    <input type="range" id="llm_temperature" name="llm.local.temperature" min="0" max="1" step="0.1" value="0.3">
+                    <input type="range" id="llm_temperature" name="llm.local.temperature" min="0" max="1" step="0.1"
+                        value="0.3">
                     <span id="llm_temperature_value">0.3</span>
                     <small>0 = determinístico, 1 = criativo</small>
                 </div>
@@ -220,12 +228,14 @@
 
                 <div class="form-group">
                     <label for="max_queue_size">Tamanho Máximo da Fila</label>
-                    <input type="number" id="max_queue_size" name="offline_queue.max_queue_size" min="100" max="10000" value="1000">
+                    <input type="number" id="max_queue_size" name="offline_queue.max_queue_size" min="100" max="10000"
+                        value="1000">
                 </div>
 
                 <div class="form-group">
                     <label for="retry_delay">Delay Base para Retry (s)</label>
-                    <input type="number" id="retry_delay" name="offline_queue.retry_delay_base" min="10" max="300" value="30">
+                    <input type="number" id="retry_delay" name="offline_queue.retry_delay_base" min="10" max="300"
+                        value="30">
                 </div>
 
                 <div class="form-group">
@@ -284,17 +294,20 @@
 
                 <div class="form-group">
                     <label for="idle_timeout">Timeout para Idle (s)</label>
-                    <input type="number" id="idle_timeout" name="power_management.idle_timeout" min="30" max="600" value="60">
+                    <input type="number" id="idle_timeout" name="power_management.idle_timeout" min="30" max="600"
+                        value="60">
                 </div>
 
                 <div class="form-group">
                     <label for="temp_high">Temperatura Alta (°C)</label>
-                    <input type="number" id="temp_high" name="power_management.thermal.threshold_high" min="50" max="80" value="70">
+                    <input type="number" id="temp_high" name="power_management.thermal.threshold_high" min="50" max="80"
+                        value="70">
                 </div>
 
                 <div class="form-group">
                     <label for="temp_critical">Temperatura Crítica (°C)</label>
-                    <input type="number" id="temp_critical" name="power_management.thermal.threshold_critical" min="60" max="90" value="80">
+                    <input type="number" id="temp_critical" name="power_management.thermal.threshold_critical" min="60"
+                        max="90" value="80">
                 </div>
 
                 <div class="status-card">
@@ -304,6 +317,232 @@
                         <p>Temperatura: <span id="power-temp">-</span></p>
                         <p>Idle: <span id="power-idle">-</span></p>
                     </div>
+                </div>
+            </section>
+
+            <!-- USB Receiver Tab -->
+            <section id="tab-usb-receiver" class="tab-content">
+                <h2>🎧 Escuta Contínua & Transcrição</h2>
+
+                <div class="info-box">
+                    <p>💡 <strong>O Raspberry Pi pode escutar e transcrever áudio automaticamente de duas
+                            formas:</strong></p>
+                    <p>1. <strong>ReSpeaker HAT</strong> - Usa o microfone local para capturar áudio</p>
+                    <p>2. <strong>USB Gadget</strong> - Recebe áudio de um PC conectado via USB</p>
+                </div>
+
+                <!-- Modo 1: ReSpeaker (Microfone Local) -->
+                <div class="config-section">
+                    <h3>🎙️ Modo 1: ReSpeaker HAT (Microfone Local)</h3>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="usb_receiver_enabled" name="usb_receiver.enabled" checked>
+                            <strong>Habilitar Escuta via ReSpeaker</strong>
+                        </label>
+                        <small>Usa o microfone do ReSpeaker HAT para capturar áudio ambiente</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="usb_continuous_listen" name="usb_receiver.continuous_listen"
+                                checked>
+                            <strong>Escuta Contínua Automática</strong>
+                        </label>
+                        <small>Quando habilitado, escuta e transcreve 24/7 automaticamente</small>
+                    </div>
+                </div>
+
+                <!-- Modo 2: USB Gadget -->
+                <div class="config-section">
+                    <h3>🔌 Modo 2: USB Gadget (Áudio via USB)</h3>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="usb_gadget_enabled" name="usb_receiver.usb_gadget_enabled">
+                            <strong>Habilitar USB Gadget</strong>
+                        </label>
+                        <small>⚠️ Transforma o Pi em placa de som USB. Requer:
+                            <code>sudo ./scripts/setup_usb_gadget.sh</code></small>
+                    </div>
+                </div>
+
+                <!-- Controles de Escuta -->
+                <div class="status-card">
+                    <h3>🎛️ Controles de Escuta</h3>
+
+                    <div class="listener-controls">
+                        <button type="button" id="btn-listener-start" class="btn btn-primary">
+                            ▶️ Iniciar Escuta
+                        </button>
+                        <button type="button" id="btn-listener-pause" class="btn btn-secondary" disabled>
+                            ⏸️ Pausar
+                        </button>
+                        <button type="button" id="btn-listener-stop" class="btn btn-danger" disabled>
+                            ⏹️ Parar
+                        </button>
+                    </div>
+
+                    <div id="listener-status" class="listener-status">
+                        <p>Estado: <span id="listener-state" class="status-badge">Parado</span></p>
+                        <p>Segmentos transcritos: <span id="listener-segments-count">0</span></p>
+                    </div>
+                </div>
+                <!-- Transcrições em Tempo Real -->
+                <div class="status-card transcriptions-panel">
+                    <div class="panel-header">
+                        <h3>📝 Transcrições em Tempo Real</h3>
+                        <div class="panel-actions">
+                            <button type="button" id="btn-export-json" class="btn btn-small" title="Exportar JSON">
+                                📥 JSON
+                            </button>
+                            <button type="button" id="btn-export-txt" class="btn btn-small" title="Exportar TXT">
+                                📄 TXT
+                            </button>
+                            <button type="button" id="btn-clear-segments" class="btn btn-small btn-danger"
+                                title="Limpar">
+                                🗑️
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Filtros e Busca -->
+                    <div class="transcription-filters">
+                        <div class="search-box">
+                            <input type="text" id="transcription-search" placeholder="🔍 Buscar nas transcrições...">
+                        </div>
+                        <div class="filter-options">
+                            <label class="filter-item">
+                                <input type="checkbox" id="filter-with-summary" checked>
+                                Com resumo
+                            </label>
+                            <select id="filter-duration">
+                                <option value="">Todas durações</option>
+                                <option value="short">Curtas (&lt; 10s)</option>
+                                <option value="medium">Médias (10-60s)</option>
+                                <option value="long">Longas (&gt; 60s)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <!-- Lista de Transcrições -->
+                    <div id="live-transcriptions" class="live-transcriptions">
+                        <p class="empty-message">Nenhuma transcrição ainda. Inicie a escuta para ver as transcrições em
+                            tempo real.</p>
+                    </div>
+
+                    <!-- Controles Inferiores -->
+                    <div class="transcription-footer">
+                        <span id="transcription-count">0 transcrições</span>
+                        <button type="button" id="btn-refresh-transcriptions" class="btn btn-secondary">
+                            🔄 Atualizar
+                        </button>
+                        <button type="button" id="btn-load-more" class="btn btn-secondary" disabled>
+                            📜 Carregar mais
+                        </button>
+                    </div>
+                </div>
+
+                <div id="usb-receiver-config" class="config-section">
+                    <h3>Configurações de Gravação</h3>
+
+                    <div class="form-group">
+                        <label for="usb_save_directory">Diretório de Gravações</label>
+                        <input type="text" id="usb_save_directory" name="usb_receiver.save_directory"
+                            value="~/audio-recordings">
+                        <small>Onde os arquivos de áudio serão salvos</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="usb_sample_rate">Taxa de Amostragem</label>
+                        <select id="usb_sample_rate" name="usb_receiver.sample_rate">
+                            <option value="44100">44100 Hz (CD Quality)</option>
+                            <option value="48000">48000 Hz (DVD Quality)</option>
+                            <option value="16000">16000 Hz (Otimizado Whisper)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="usb_channels">Canais</label>
+                        <select id="usb_channels" name="usb_receiver.channels">
+                            <option value="2">Stereo (2 canais)</option>
+                            <option value="1">Mono (1 canal)</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="usb_max_duration">Duração Máxima por Arquivo (segundos)</label>
+                        <input type="number" id="usb_max_duration" name="usb_receiver.max_audio_duration" min="60"
+                            max="3600" value="300">
+                        <small>Arquivos serão divididos após este tempo</small>
+                    </div>
+
+                    <h3>Processamento Automático</h3>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="usb_auto_transcribe" name="usb_receiver.auto_transcribe" checked>
+                            Transcrever automaticamente com Whisper
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="usb_auto_summarize" name="usb_receiver.auto_summarize" checked>
+                            Gerar resumo automático com LLM
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="usb_min_duration">Duração Mínima para Processar (segundos)</label>
+                        <input type="number" id="usb_min_duration" name="usb_receiver.min_audio_duration" min="1"
+                            max="60" step="0.5" value="3">
+                        <small>Áudios menores serão ignorados</small>
+                    </div>
+
+                    <h3>Divisão por Silêncio</h3>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="usb_silence_split" name="usb_receiver.silence_split" checked>
+                            Dividir gravação quando detectar silêncio
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="usb_silence_threshold">Tempo de Silêncio para Dividir (segundos)</label>
+                        <input type="number" id="usb_silence_threshold" name="usb_receiver.silence_threshold" min="0.5"
+                            max="10" step="0.5" value="2">
+                    </div>
+
+                    <h3>Opções Adicionais</h3>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="usb_process_on_disconnect"
+                                name="usb_receiver.process_on_disconnect" checked>
+                            Processar quando USB desconectar
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="usb_keep_original" name="usb_receiver.keep_original_audio"
+                                checked>
+                            Manter arquivo de áudio original após processar
+                        </label>
+                    </div>
+                </div>
+
+                <div class="status-card">
+                    <h3>Status do USB Gadget</h3>
+                    <div id="usb-gadget-status">
+                        <p>Estado: <span id="usb-gadget-state">Não configurado</span></p>
+                        <p>Módulo g_audio: <span id="usb-module-status">-</span></p>
+                        <p>Gravações Salvas: <span id="usb-recordings-count">0</span></p>
+                    </div>
+                    <button type="button" id="btn-check-usb-status" class="btn btn-secondary">🔄 Verificar
+                        Status</button>
                 </div>
             </section>
 
@@ -427,4 +666,5 @@
 
     <script src="/static/js/app.js"></script>
 </body>
+
 </html>

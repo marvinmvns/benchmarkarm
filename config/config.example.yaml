@@ -81,3 +81,34 @@ hardware:
   respeaker_type: "2mic"
   led_enabled: true
   button_gpio: 17
+# Escuta Contínua & Transcrição Automática
+# ==========================================
+# Dois modos de entrada de áudio:
+#   1. ReSpeaker HAT - Microfone local (habilitado por padrão)
+#   2. USB Gadget - Recebe áudio via USB de um PC (requer setup)
+usb_receiver:
+  # Modo 1: ReSpeaker HAT (Microfone Local)
+  enabled: true                       # Habilitar escuta via ReSpeaker
+  continuous_listen: true             # Escuta contínua 24/7 automática
+  
+  # Modo 2: USB Gadget (Áudio via USB)
+  usb_gadget_enabled: false           # Desabilitado por padrão (requer: sudo ./scripts/setup_usb_gadget.sh)
+  
+  # Configurações de Gravação
+  save_directory: "~/audio-recordings"  # Onde salvar gravações
+  sample_rate: 44100                  # Taxa de amostragem (CD quality)
+  channels: 2                         # Stereo
+  max_audio_duration: 300             # Duração máxima por arquivo (5 minutos)
+  
+  # Processamento Automático
+  auto_transcribe: true               # Transcrever com Whisper
+  auto_summarize: true                # Gerar resumo com LLM
+  min_audio_duration: 3.0             # Duração mínima para processar (segundos)
+  
+  # Divisão por Silêncio
+  silence_split: true                 # Dividir gravação em segmentos
+  silence_threshold: 2.0              # Segundos de silêncio para dividir
+  
+  # Opções Adicionais
+  process_on_disconnect: true         # Processar quando USB desconectar
+  keep_original_audio: true           # Manter arquivo WAV original
