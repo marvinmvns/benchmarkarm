@@ -1096,6 +1096,28 @@ async function refreshModelStatus() {
                 }
             }
 
+            // Atualizar status dos executáveis
+            if (result.executables) {
+                const whisperReady = result.executables.whisper_cpp_ready;
+                const llamaReady = result.executables.llama_cpp_ready;
+
+                // Atualizar indicadores se existirem
+                const whisperExeStatus = $('#whisper-exe-status');
+                const llamaExeStatus = $('#llama-exe-status');
+
+                if (whisperExeStatus) {
+                    whisperExeStatus.textContent = whisperReady ? '✅ Compilado' : '❌ Não compilado';
+                    whisperExeStatus.className = whisperReady ? 'exe-status ready' : 'exe-status not-ready';
+                }
+                if (llamaExeStatus) {
+                    llamaExeStatus.textContent = llamaReady ? '✅ Compilado' : '❌ Não compilado';
+                    llamaExeStatus.className = llamaReady ? 'exe-status ready' : 'exe-status not-ready';
+                }
+
+                // Console log para debug
+                console.log('Executables status:', result.executables);
+            }
+
             // Atualizar progresso de download
             updateDownloadProgress(result.download);
         }

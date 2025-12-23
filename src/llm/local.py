@@ -104,18 +104,28 @@ class LocalLLM(LLMProvider):
 
     def _find_llama_cpp(self) -> str:
         """Encontra executável do llama.cpp."""
-        possible_paths = [
-            self._project_root / "external" / "llama.cpp" / "main",
-            self._project_root / "external" / "llama.cpp" / "build" / "bin" / "main",
-            Path.home() / "llama.cpp" / "main",
-            Path("/usr/local/bin/llama"),
+        # Nomes possíveis do executável (llama.cpp renomeou 'main' para 'llama-cli')
+        exe_names = ["llama-cli", "llama-simple", "main", "llama"]
+        
+        search_dirs = [
+            self._project_root / "external" / "llama.cpp" / "build" / "bin",
+            self._project_root / "external" / "llama.cpp" / "build",
+            self._project_root / "external" / "llama.cpp",
+            Path.home() / "llama.cpp" / "build" / "bin",
+            Path.home() / "llama.cpp" / "build",
+            Path.home() / "llama.cpp",
+            Path("/usr/local/bin"),
+            Path("/usr/bin"),
         ]
 
-        for path in possible_paths:
-            if path.exists():
-                return str(path)
+        for search_dir in search_dirs:
+            for exe_name in exe_names:
+                path = search_dir / exe_name
+                if path.exists() and path.is_file():
+                    return str(path)
 
-        return str(self._project_root / "external" / "llama.cpp" / "main")
+        # Retornar caminho padrão esperado
+        return str(self._project_root / "external" / "llama.cpp" / "build" / "bin" / "llama-cli")
 
     def _resolve_model_path(self, model: str) -> str:
         """Resolve caminho do modelo."""

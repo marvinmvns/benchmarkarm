@@ -412,21 +412,60 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             # Verificar modelos LLM
             llm_status = {}
             llm_files = {
-                "tinyllama": "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
-                "phi2": "phi-2.Q4_K_M.gguf",
-                "gemma2b": "gemma-2b-it.Q4_K_M.gguf",
+                "tinyllama": "tinyllama-1.1b-q4.gguf",
+                "phi2": "phi-2-q4.gguf",
+                "gemma2b": "gemma-2b-q4.gguf",
             }
             for model, filename in llm_files.items():
                 model_file = llm_dir / filename
-                # Também checar nome alternativo
-                alt_file = llm_dir / f"{model}.gguf"
-                llm_status[model] = model_file.exists() or alt_file.exists()
+                # Também checar variações de nome
+                alt_names = [
+                    llm_dir / f"{model}.gguf",
+                    llm_dir / f"ggml-{model}.gguf",
+                ]
+                found = model_file.exists() or any(f.exists() for f in alt_names)
+                llm_status[model] = found
+            
+            # Verificar executáveis compilados
+            whisper_cpp_ready = False
+            llama_cpp_ready = False
+            llama_cpp_path = None
+            
+            # Whisper.cpp
+            whisper_builds = [
+                project_root / "external" / "whisper.cpp" / "build" / "bin" / "main",
+                project_root / "external" / "whisper.cpp" / "build" / "bin" / "whisper",
+                project_root / "external" / "whisper.cpp" / "main",
+            ]
+            whisper_cpp_ready = any(p.exists() for p in whisper_builds)
+            
+            # Llama.cpp
+            llama_exe_names = ["llama-cli", "llama-simple", "main", "llama"]
+            llama_dirs = [
+                project_root / "external" / "llama.cpp" / "build" / "bin",
+                project_root / "external" / "llama.cpp" / "build",
+                project_root / "external" / "llama.cpp",
+            ]
+            for d in llama_dirs:
+                for exe in llama_exe_names:
+                    path = d / exe
+                    if path.exists() and path.is_file():
+                        llama_cpp_ready = True
+                        llama_cpp_path = str(path)
+                        break
+                if llama_cpp_ready:
+                    break
             
             return jsonify({
                 "success": True,
                 "whisper": whisper_status,
                 "llm": llm_status,
                 "download": download_status,
+                "executables": {
+                    "whisper_cpp_ready": whisper_cpp_ready,
+                    "llama_cpp_ready": llama_cpp_ready,
+                    "llama_cpp_path": llama_cpp_path,
+                },
             })
         except Exception as e:
             return jsonify({"error": str(e)}), 500
