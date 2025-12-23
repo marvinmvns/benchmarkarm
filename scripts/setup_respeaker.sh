@@ -138,14 +138,47 @@ esac
 
 log_info "Configurando: $OVERLAY_NAME"
 
-# Se usar HinTak, pular para instalação direta
+# Se usar HinTak, pular para instalação direta com branch correto para o kernel
 if [ "$USE_HINTAK" = true ]; then
     log_info "Usando driver HinTak/seeed-voicecard..."
+    
+    # Detectar versão do kernel (ex: 6.12.15-v8+ -> 6.12)
+    KERNEL_FULL=$(uname -r)
+    KERNEL_MAJOR=$(echo "$KERNEL_FULL" | cut -d. -f1)
+    KERNEL_MINOR=$(echo "$KERNEL_FULL" | cut -d. -f2)
+    KERNEL_VERSION="v${KERNEL_MAJOR}.${KERNEL_MINOR}"
+    
+    log_info "Kernel detectado: $KERNEL_FULL"
+    log_info "Branch HinTak: $KERNEL_VERSION"
     
     OVERLAY_DIR="/tmp/seeed-voicecard-hintak"
     rm -rf "$OVERLAY_DIR"
     
-    git clone --depth 1 https://github.com/HinTak/seeed-voicecard.git "$OVERLAY_DIR"
+    # Tentar clonar o branch específico do kernel
+    if git clone --depth 1 --branch "$KERNEL_VERSION" https://github.com/HinTak/seeed-voicecard.git "$OVERLAY_DIR" 2>/dev/null; then
+        log_success "Branch $KERNEL_VERSION encontrado!"
+    else
+        log_warn "Branch $KERNEL_VERSION não encontrado. Tentando branches próximos..."
+        
+        # Tentar versões anteriores do minor
+        FOUND_BRANCH=false
+        for try_minor in $(seq $KERNEL_MINOR -1 0); do
+            TRY_VERSION="v${KERNEL_MAJOR}.${try_minor}"
+            log_info "Tentando $TRY_VERSION..."
+            if git clone --depth 1 --branch "$TRY_VERSION" https://github.com/HinTak/seeed-voicecard.git "$OVERLAY_DIR" 2>/dev/null; then
+                log_success "Usando branch $TRY_VERSION"
+                FOUND_BRANCH=true
+                break
+            fi
+        done
+        
+        # Se não encontrou, usar master
+        if [ "$FOUND_BRANCH" != "true" ]; then
+            log_warn "Nenhum branch compatível encontrado. Usando master..."
+            git clone --depth 1 https://github.com/HinTak/seeed-voicecard.git "$OVERLAY_DIR"
+        fi
+    fi
+    
     cd "$OVERLAY_DIR"
     
     log_info "Executando instalador..."
