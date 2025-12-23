@@ -131,17 +131,26 @@ class WhisperTranscriber:
     def _find_whisper_cpp(self) -> str:
         """Encontra executável do whisper.cpp."""
         possible_paths = [
-            self._project_root / "external" / "whisper.cpp" / "main",
+            # Instalação com cmake (padrão atual)
+            self._project_root / "external" / "whisper.cpp" / "build" / "bin" / "whisper-cli",
             self._project_root / "external" / "whisper.cpp" / "build" / "bin" / "main",
+            # Instalação antiga com make
+            self._project_root / "external" / "whisper.cpp" / "main",
+            self._project_root / "external" / "whisper.cpp" / "whisper-cli",
+            # Sistema
+            Path.home() / "whisper.cpp" / "build" / "bin" / "whisper-cli",
             Path.home() / "whisper.cpp" / "main",
             Path("/usr/local/bin/whisper-cpp"),
+            Path("/usr/local/bin/whisper-cli"),
         ]
 
         for path in possible_paths:
             if path.exists():
+                logger.info(f"whisper.cpp encontrado: {path}")
                 return str(path)
 
-        return str(self._project_root / "external" / "whisper.cpp" / "main")
+        # Fallback - retorna o caminho esperado mais comum
+        return str(self._project_root / "external" / "whisper.cpp" / "build" / "bin" / "whisper-cli")
 
     def _get_models_path(self) -> str:
         """Retorna caminho dos modelos."""
