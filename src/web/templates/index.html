@@ -25,6 +25,7 @@
             <button class="tab-btn" data-tab="audio">Áudio</button>
             <button class="tab-btn" data-tab="whisper">Whisper</button>
             <button class="tab-btn" data-tab="llm">LLM</button>
+            <button class="tab-btn" data-tab="models">📦 Modelos</button>
             <button class="tab-btn" data-tab="offline">Offline</button>
             <button class="tab-btn" data-tab="power">Energia</button>
             <button class="tab-btn" data-tab="usb-receiver">🎧 Escuta Contínua</button>
@@ -211,6 +212,115 @@
                         value="0.3">
                     <span id="llm_temperature_value">0.3</span>
                     <small>0 = determinístico, 1 = criativo</small>
+                </div>
+            </section>
+
+            <!-- Models Tab -->
+            <section id="tab-models" class="tab-content">
+                <h2>📦 Gerenciador de Modelos</h2>
+
+                <!-- Whisper Models -->
+                <div class="config-section">
+                    <h3>🎙️ Modelos Whisper (Transcrição)</h3>
+                    <p class="section-description">Modelos para transcrição de áudio. Modelos menores são mais rápidos
+                        mas menos precisos.</p>
+
+                    <div id="whisper-models" class="models-grid">
+                        <div class="model-card" data-model="tiny">
+                            <div class="model-header">
+                                <span class="model-name">tiny</span>
+                                <span class="model-size">~75 MB</span>
+                            </div>
+                            <p class="model-desc">Mais rápido, menos preciso. Ideal para Pi Zero.</p>
+                            <div class="model-actions">
+                                <span class="model-status" id="whisper-tiny-status">❓</span>
+                                <button class="btn btn-small" onclick="downloadWhisperModel('tiny')">📥 Baixar</button>
+                            </div>
+                        </div>
+
+                        <div class="model-card" data-model="base">
+                            <div class="model-header">
+                                <span class="model-name">base</span>
+                                <span class="model-size">~142 MB</span>
+                            </div>
+                            <p class="model-desc">Bom equilíbrio velocidade/precisão.</p>
+                            <div class="model-actions">
+                                <span class="model-status" id="whisper-base-status">❓</span>
+                                <button class="btn btn-small" onclick="downloadWhisperModel('base')">📥 Baixar</button>
+                            </div>
+                        </div>
+
+                        <div class="model-card" data-model="small">
+                            <div class="model-header">
+                                <span class="model-name">small</span>
+                                <span class="model-size">~466 MB</span>
+                            </div>
+                            <p class="model-desc">Mais preciso, mais lento.</p>
+                            <div class="model-actions">
+                                <span class="model-status" id="whisper-small-status">❓</span>
+                                <button class="btn btn-small" onclick="downloadWhisperModel('small')">📥 Baixar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- LLM Models -->
+                <div class="config-section">
+                    <h3>🤖 Modelos LLM (Resumo/Chat)</h3>
+                    <p class="section-description">Modelos de linguagem para gerar resumos. Precisam de mais RAM/swap.
+                    </p>
+
+                    <div id="llm-models" class="models-grid">
+                        <div class="model-card" data-model="tinyllama">
+                            <div class="model-header">
+                                <span class="model-name">TinyLlama 1.1B</span>
+                                <span class="model-size">~670 MB</span>
+                            </div>
+                            <p class="model-desc">Modelo pequeno, funciona no Pi Zero com swap.</p>
+                            <div class="model-actions">
+                                <span class="model-status" id="llm-tinyllama-status">❓</span>
+                                <button class="btn btn-small" onclick="downloadLLMModel('tinyllama')">📥 Baixar</button>
+                            </div>
+                        </div>
+
+                        <div class="model-card" data-model="phi2">
+                            <div class="model-header">
+                                <span class="model-name">Phi-2 2.7B</span>
+                                <span class="model-size">~1.6 GB</span>
+                            </div>
+                            <p class="model-desc">Mais capaz, requer mais recursos.</p>
+                            <div class="model-actions">
+                                <span class="model-status" id="llm-phi2-status">❓</span>
+                                <button class="btn btn-small" onclick="downloadLLMModel('phi2')">📥 Baixar</button>
+                            </div>
+                        </div>
+
+                        <div class="model-card" data-model="gemma2b">
+                            <div class="model-header">
+                                <span class="model-name">Gemma 2B</span>
+                                <span class="model-size">~1.5 GB</span>
+                            </div>
+                            <p class="model-desc">Google Gemma, boa qualidade.</p>
+                            <div class="model-actions">
+                                <span class="model-status" id="llm-gemma2b-status">❓</span>
+                                <button class="btn btn-small" onclick="downloadLLMModel('gemma2b')">📥 Baixar</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Download Progress -->
+                <div id="download-progress" class="status-card" style="display: none;">
+                    <h3>⏳ Download em Progresso</h3>
+                    <div class="progress-bar">
+                        <div class="progress-fill" id="download-progress-fill" style="width: 0%"></div>
+                    </div>
+                    <p id="download-progress-text">Iniciando...</p>
+                </div>
+
+                <!-- Refresh Button -->
+                <div style="margin-top: 16px;">
+                    <button class="btn btn-secondary" onclick="refreshModelStatus()">🔄 Atualizar Status</button>
                 </div>
             </section>
 
@@ -427,7 +537,8 @@
 
                     <!-- Lista de Transcrições -->
                     <div id="live-transcriptions" class="live-transcriptions">
-                        <p class="empty-message">Nenhuma transcrição ainda. Inicie a escuta para ver as transcrições em
+                        <p class="empty-message">Nenhuma transcrição ainda. Inicie a escuta para ver as transcrições
+                            em
                             tempo real.</p>
                     </div>
 

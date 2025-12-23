@@ -377,6 +377,169 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             return jsonify({"error": str(e)}), 500
 
     # ==========================================================================
+    # Gerenciamento de Modelos
+    # ==========================================================================
+    
+    # URLs dos modelos
+    WHISPER_MODELS = {
+        "tiny": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-tiny.bin",
+        "base": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.bin",
+        "small": "https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-small.bin",
+    }
+    
+    LLM_MODELS = {
+        "tinyllama": "https://huggingface.co/TheBloke/TinyLlama-1.1B-Chat-v1.0-GGUF/resolve/main/tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+        "phi2": "https://huggingface.co/TheBloke/phi-2-GGUF/resolve/main/phi-2.Q4_K_M.gguf",
+        "gemma2b": "https://huggingface.co/google/gemma-2b-it-GGUF/resolve/main/gemma-2b-it.Q4_K_M.gguf",
+    }
+    
+    download_status = {"downloading": False, "model": None, "progress": 0, "error": None}
+    
+    @app.route("/api/models/status", methods=["GET"])
+    def models_status():
+        """Retorna status dos modelos instalados."""
+        try:
+            project_root = Path(__file__).parent.parent.parent
+            whisper_dir = project_root / "external" / "whisper.cpp" / "models"
+            llm_dir = project_root / "models"
+            
+            # Verificar modelos Whisper
+            whisper_status = {}
+            for model in WHISPER_MODELS.keys():
+                model_file = whisper_dir / f"ggml-{model}.bin"
+                whisper_status[model] = model_file.exists()
+            
+            # Verificar modelos LLM
+            llm_status = {}
+            llm_files = {
+                "tinyllama": "tinyllama-1.1b-chat-v1.0.Q4_K_M.gguf",
+                "phi2": "phi-2.Q4_K_M.gguf",
+                "gemma2b": "gemma-2b-it.Q4_K_M.gguf",
+            }
+            for model, filename in llm_files.items():
+                model_file = llm_dir / filename
+                # Também checar nome alternativo
+                alt_file = llm_dir / f"{model}.gguf"
+                llm_status[model] = model_file.exists() or alt_file.exists()
+            
+            return jsonify({
+                "success": True,
+                "whisper": whisper_status,
+                "llm": llm_status,
+                "download": download_status,
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/models/download/whisper/<model>", methods=["POST"])
+    def download_whisper_model(model):
+        """Baixa um modelo Whisper."""
+        try:
+            if model not in WHISPER_MODELS:
+                return jsonify({"error": f"Modelo inválido: {model}"}), 400
+            
+            if download_status["downloading"]:
+                return jsonify({"error": "Já existe um download em andamento"}), 400
+            
+            project_root = Path(__file__).parent.parent.parent
+            whisper_dir = project_root / "external" / "whisper.cpp" / "models"
+            whisper_dir.mkdir(parents=True, exist_ok=True)
+            
+            output_file = whisper_dir / f"ggml-{model}.bin"
+            url = WHISPER_MODELS[model]
+            
+            # Iniciar download em thread separada
+            def do_download():
+                import urllib.request
+                download_status["downloading"] = True
+                download_status["model"] = f"whisper-{model}"
+                download_status["progress"] = 0
+                download_status["error"] = None
+                
+                try:
+                    def reporthook(count, block_size, total_size):
+                        if total_size > 0:
+                            download_status["progress"] = min(100, int(count * block_size * 100 / total_size))
+                    
+                    urllib.request.urlretrieve(url, str(output_file), reporthook)
+                    download_status["progress"] = 100
+                except Exception as e:
+                    download_status["error"] = str(e)
+                finally:
+                    download_status["downloading"] = False
+            
+            thread = threading.Thread(target=do_download)
+            thread.start()
+            
+            return jsonify({
+                "success": True,
+                "message": f"Download do modelo {model} iniciado",
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/models/download/llm/<model>", methods=["POST"])
+    def download_llm_model(model):
+        """Baixa um modelo LLM."""
+        try:
+            if model not in LLM_MODELS:
+                return jsonify({"error": f"Modelo inválido: {model}"}), 400
+            
+            if download_status["downloading"]:
+                return jsonify({"error": "Já existe um download em andamento"}), 400
+            
+            project_root = Path(__file__).parent.parent.parent
+            llm_dir = project_root / "models"
+            llm_dir.mkdir(parents=True, exist_ok=True)
+            
+            # Nome do arquivo de saída
+            filenames = {
+                "tinyllama": "tinyllama-1.1b-q4.gguf",
+                "phi2": "phi-2-q4.gguf",
+                "gemma2b": "gemma-2b-q4.gguf",
+            }
+            output_file = llm_dir / filenames.get(model, f"{model}.gguf")
+            url = LLM_MODELS[model]
+            
+            # Iniciar download em thread separada
+            def do_download():
+                import urllib.request
+                download_status["downloading"] = True
+                download_status["model"] = f"llm-{model}"
+                download_status["progress"] = 0
+                download_status["error"] = None
+                
+                try:
+                    def reporthook(count, block_size, total_size):
+                        if total_size > 0:
+                            download_status["progress"] = min(100, int(count * block_size * 100 / total_size))
+                    
+                    urllib.request.urlretrieve(url, str(output_file), reporthook)
+                    download_status["progress"] = 100
+                except Exception as e:
+                    download_status["error"] = str(e)
+                finally:
+                    download_status["downloading"] = False
+            
+            thread = threading.Thread(target=do_download)
+            thread.start()
+            
+            return jsonify({
+                "success": True,
+                "message": f"Download do modelo {model} iniciado",
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/models/download/status", methods=["GET"])
+    def download_progress():
+        """Retorna progresso do download atual."""
+        return jsonify({
+            "success": True,
+            **download_status,
+        })
+
+    # ==========================================================================
     # Transcrição - Novas Rotas
     # ==========================================================================
     

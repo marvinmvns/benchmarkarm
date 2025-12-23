@@ -385,6 +385,7 @@ function initTabs() {
             if (btn.dataset.tab === 'offline') refreshQueueStats();
             if (btn.dataset.tab === 'power') refreshPowerStatus();
             if (btn.dataset.tab === 'transcription') refreshProcessorStatus();
+            if (btn.dataset.tab === 'models') refreshModelStatus();
             if (btn.dataset.tab === 'usb-receiver') {
                 refreshListenerStatus();
                 refreshLiveTranscriptions();
@@ -1058,6 +1059,125 @@ function debounce(func, wait) {
 }
 
 // ==========================================================================
+// Gerenciamento de Modelos
+// ==========================================================================
+
+let downloadPollingInterval = null;
+
+async function refreshModelStatus() {
+    try {
+        const result = await apiGet('models/status');
+        if (result.success) {
+            // Atualizar status modelos Whisper
+            for (const [model, installed] of Object.entries(result.whisper || {})) {
+                const statusEl = $(`#whisper-${model}-status`);
+                const cardEl = document.querySelector(`#whisper-models [data-model="${model}"]`);
+                if (statusEl) {
+                    statusEl.textContent = installed ? '✅' : '❌';
+                }
+                if (cardEl) {
+                    cardEl.classList.toggle('installed', installed);
+                }
+            }
+
+            // Atualizar status modelos LLM
+            for (const [model, installed] of Object.entries(result.llm || {})) {
+                const statusEl = $(`#llm-${model}-status`);
+                const cardEl = document.querySelector(`#llm-models [data-model="${model}"]`);
+                if (statusEl) {
+                    statusEl.textContent = installed ? '✅' : '❌';
+                }
+                if (cardEl) {
+                    cardEl.classList.toggle('installed', installed);
+                }
+            }
+
+            // Atualizar progresso de download
+            updateDownloadProgress(result.download);
+        }
+    } catch (error) {
+        console.error('Erro ao obter status dos modelos:', error);
+    }
+}
+
+function updateDownloadProgress(download) {
+    const progressDiv = $('#download-progress');
+    const progressFill = $('#download-progress-fill');
+    const progressText = $('#download-progress-text');
+
+    if (!progressDiv) return;
+
+    if (download && download.downloading) {
+        progressDiv.style.display = 'block';
+        progressFill.style.width = `${download.progress}%`;
+        progressText.textContent = `Baixando ${download.model}... ${download.progress}%`;
+
+        // Iniciar polling se não estiver ativo
+        if (!downloadPollingInterval) {
+            downloadPollingInterval = setInterval(pollDownloadProgress, 2000);
+        }
+    } else {
+        if (download && download.error) {
+            progressText.textContent = `Erro: ${download.error}`;
+            progressFill.style.width = '0%';
+        } else if (download && download.progress === 100) {
+            progressText.textContent = 'Download concluído!';
+            setTimeout(() => {
+                progressDiv.style.display = 'none';
+                refreshModelStatus();
+            }, 2000);
+        } else {
+            progressDiv.style.display = 'none';
+        }
+
+        // Parar polling
+        if (downloadPollingInterval) {
+            clearInterval(downloadPollingInterval);
+            downloadPollingInterval = null;
+        }
+    }
+}
+
+async function pollDownloadProgress() {
+    try {
+        const result = await apiGet('models/download/status');
+        if (result.success) {
+            updateDownloadProgress(result);
+        }
+    } catch (error) {
+        console.error('Erro ao obter progresso:', error);
+    }
+}
+
+async function downloadWhisperModel(model) {
+    try {
+        const result = await apiPost(`models/download/whisper/${model}`);
+        if (result.success) {
+            refreshModelStatus();
+        } else {
+            alert(result.error || 'Erro ao iniciar download');
+        }
+    } catch (error) {
+        console.error('Erro ao baixar modelo:', error);
+        alert('Erro ao iniciar download');
+    }
+}
+
+async function downloadLLMModel(model) {
+    try {
+        const result = await apiPost(`models/download/llm/${model}`);
+        if (result.success) {
+            refreshModelStatus();
+        } else {
+            alert(result.error || 'Erro ao iniciar download');
+        }
+    } catch (error) {
+        console.error('Erro ao baixar modelo:', error);
+        alert('Erro ao iniciar download');
+    }
+}
+
+// ==========================================================================
 // Init
 // ==========================================================================
 
@@ -1071,4 +1191,3 @@ document.addEventListener('DOMContentLoaded', () => {
     // Auto-refresh system info every 30s
     setInterval(refreshSystemInfo, 30000);
 });
-
