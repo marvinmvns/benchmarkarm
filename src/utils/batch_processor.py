@@ -114,6 +114,7 @@ class BatchProcessor:
                     threads=config.whisper.threads,
                     beam_size=config.whisper.beam_size,
                     quantization=config.whisper.quantization,
+                    stream_mode=getattr(config.whisper, 'stream_mode', False),
                 )
             except Exception as e:
                 logger.error(f"Erro ao criar transcritor: {e}")

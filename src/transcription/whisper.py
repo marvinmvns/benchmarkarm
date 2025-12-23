@@ -78,6 +78,7 @@ class WhisperTranscriber:
         quantization: str = "q5_0",
         whisper_cpp_path: Optional[str] = None,
         models_path: Optional[str] = None,
+        stream_mode: bool = False,
     ):
         """
         Inicializa o transcritor.
@@ -91,6 +92,7 @@ class WhisperTranscriber:
             quantization: Quantização do modelo (f16, q8_0, q5_0, q4_0)
             whisper_cpp_path: Caminho para whisper.cpp
             models_path: Caminho para modelos
+            stream_mode: Usar modo streaming (transcrição em tempo real)
         """
         self.model = model
         self.language = language
@@ -98,6 +100,7 @@ class WhisperTranscriber:
         self.threads = threads
         self.beam_size = beam_size
         self.quantization = quantization
+        self.stream_mode = stream_mode
 
         # Encontrar caminhos
         self._project_root = self._find_project_root()
@@ -117,7 +120,7 @@ class WhisperTranscriber:
 
         logger.info(
             f"Transcritor inicializado: model={model}, "
-            f"language={language}, use_cpp={self.use_cpp}"
+            f"language={language}, use_cpp={self.use_cpp}, stream={stream_mode}"
         )
 
     def _find_project_root(self) -> Path:

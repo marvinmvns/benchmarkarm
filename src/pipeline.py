@@ -117,6 +117,7 @@ class VoiceProcessor:
             threads=whisper_config.threads,
             beam_size=whisper_config.beam_size,
             quantization=whisper_config.quantization,
+            stream_mode=getattr(whisper_config, 'stream_mode', False),
         )
 
     def _init_llm(self) -> None:

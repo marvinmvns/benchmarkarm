@@ -155,6 +155,14 @@
                     <input type="number" id="whisper_beam_size" name="whisper.beam_size" min="1" max="5" value="1">
                     <small>1 = mais rápido (greedy), maior = mais preciso</small>
                 </div>
+
+                <div class="form-group">
+                    <label>
+                        <input type="checkbox" id="whisper_stream_mode" name="whisper.stream_mode">
+                        🔴 Modo Stream (Transcrição em tempo real)
+                    </label>
+                    <small>Transcreve enquanto o áudio é capturado. Usa mais CPU.</small>
+                </div>
             </section>
 
             <!-- LLM Tab -->

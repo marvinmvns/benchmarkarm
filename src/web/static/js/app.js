@@ -149,6 +149,7 @@ function populateForm(cfg) {
         $('#whisper_use_cpp').checked = cfg.whisper.use_cpp !== false;
         $('#whisper_threads').value = cfg.whisper.threads || 4;
         $('#whisper_beam_size').value = cfg.whisper.beam_size || 1;
+        $('#whisper_stream_mode').checked = cfg.whisper.stream_mode === true;
     }
 
     // LLM
@@ -236,6 +237,7 @@ function collectFormValues() {
     config.whisper.use_cpp = $('#whisper_use_cpp').checked;
     config.whisper.threads = parseInt($('#whisper_threads').value);
     config.whisper.beam_size = parseInt($('#whisper_beam_size').value);
+    config.whisper.stream_mode = $('#whisper_stream_mode').checked;
 
     // LLM
     if (!config.llm) config.llm = {};

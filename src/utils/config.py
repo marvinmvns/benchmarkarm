@@ -60,6 +60,7 @@ class WhisperConfig:
     quantization: str = "q5_0"
     beam_size: int = 1
     suppress_blank: bool = True
+    stream_mode: bool = False              # Modo streaming (transcrição em tempo real)
 
 
 @dataclass
