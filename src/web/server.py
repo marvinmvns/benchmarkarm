@@ -240,6 +240,185 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    # ==========================================================================
+    # Transcrição - Novas Rotas
+    # ==========================================================================
+    
+    # Estado global para transcrições (em produção, usar banco de dados)
+    transcription_history = []
+    processor_state = {
+        "is_recording": False,
+        "is_processing": False,
+        "current_transcription": None,
+    }
+
+    @app.route("/api/processor/status", methods=["GET"])
+    def processor_status():
+        """Retorna status do processador de voz."""
+        try:
+            config = load_config()
+            return jsonify({
+                "success": True,
+                "status": processor_state,
+                "config": {
+                    "mode": config.get("mode", "local"),
+                    "whisper_model": config.get("whisper", {}).get("model", "tiny"),
+                    "llm_provider": config.get("llm", {}).get("provider", "local"),
+                }
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/transcriptions", methods=["GET"])
+    def get_transcriptions():
+        """Retorna histórico de transcrições."""
+        limit = request.args.get("limit", 20, type=int)
+        return jsonify({
+            "success": True,
+            "transcriptions": transcription_history[-limit:][::-1],  # Mais recentes primeiro
+            "total": len(transcription_history)
+        })
+
+    @app.route("/api/transcriptions", methods=["DELETE"])
+    def clear_transcriptions():
+        """Limpa histórico de transcrições."""
+        transcription_history.clear()
+        return jsonify({"success": True, "message": "Histórico limpo"})
+
+    @app.route("/api/record/start", methods=["POST"])
+    def start_recording():
+        """Inicia gravação e processamento de áudio."""
+        import time
+        import threading
+        
+        if processor_state["is_recording"] or processor_state["is_processing"]:
+            return jsonify({"error": "Processamento já em andamento"}), 400
+        
+        def process_audio():
+            processor_state["is_recording"] = True
+            processor_state["is_processing"] = False
+            processor_state["current_transcription"] = None
+            
+            try:
+                # Importar o processador
+                from ..pipeline import VoiceProcessor
+                
+                config_path = app.config["CONFIG_PATH"]
+                
+                with VoiceProcessor(config_path=config_path) as processor:
+                    # Gravar
+                    processor_state["is_recording"] = True
+                    audio = processor.record()
+                    
+                    # Processar
+                    processor_state["is_recording"] = False
+                    processor_state["is_processing"] = True
+                    
+                    result = processor.process(
+                        audio=audio,
+                        generate_summary=True,
+                        summary_style="concise"
+                    )
+                    
+                    # Salvar resultado
+                    transcription_data = {
+                        "id": len(transcription_history) + 1,
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "audio_duration": round(result.audio_duration, 1),
+                        "text": result.text,
+                        "summary": result.summary,
+                        "processing_time": round(result.total_time, 2),
+                        "language": result.transcription.language if hasattr(result.transcription, 'language') else "pt",
+                    }
+                    
+                    transcription_history.append(transcription_data)
+                    processor_state["current_transcription"] = transcription_data
+                    
+            except ImportError as e:
+                logger.error(f"Erro de importação: {e}")
+                processor_state["current_transcription"] = {
+                    "error": "Módulos de processamento não disponíveis. Execute no Raspberry Pi.",
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            except Exception as e:
+                logger.error(f"Erro no processamento: {e}")
+                processor_state["current_transcription"] = {
+                    "error": str(e),
+                    "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                }
+            finally:
+                processor_state["is_recording"] = False
+                processor_state["is_processing"] = False
+        
+        # Iniciar em thread separada
+        thread = threading.Thread(target=process_audio, daemon=True)
+        thread.start()
+        
+        return jsonify({
+            "success": True,
+            "message": "Gravação iniciada"
+        })
+
+    @app.route("/api/transcribe", methods=["POST"])
+    def transcribe_audio():
+        """Recebe arquivo de áudio e retorna transcrição."""
+        import time
+        
+        if "audio" not in request.files:
+            return jsonify({"error": "Nenhum arquivo de áudio enviado"}), 400
+        
+        audio_file = request.files["audio"]
+        
+        try:
+            import tempfile
+            import os
+            
+            # Salvar arquivo temporário
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                audio_file.save(tmp.name)
+                tmp_path = tmp.name
+            
+            try:
+                from ..pipeline import VoiceProcessor
+                from ..audio.capture import AudioBuffer
+                
+                config_path = app.config["CONFIG_PATH"]
+                
+                with VoiceProcessor(config_path=config_path) as processor:
+                    audio = AudioBuffer.from_file(tmp_path)
+                    result = processor.process(
+                        audio=audio,
+                        generate_summary=True,
+                        summary_style="concise"
+                    )
+                    
+                    transcription_data = {
+                        "id": len(transcription_history) + 1,
+                        "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "audio_duration": round(result.audio_duration, 1),
+                        "text": result.text,
+                        "summary": result.summary,
+                        "processing_time": round(result.total_time, 2),
+                    }
+                    
+                    transcription_history.append(transcription_data)
+                    
+                    return jsonify({
+                        "success": True,
+                        "transcription": transcription_data
+                    })
+                    
+            finally:
+                os.unlink(tmp_path)
+                
+        except ImportError as e:
+            return jsonify({
+                "error": "Módulos de processamento não disponíveis",
+                "details": str(e)
+            }), 500
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
     return app
 
 

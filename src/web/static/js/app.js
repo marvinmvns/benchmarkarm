@@ -349,6 +349,7 @@ function initTabs() {
             if (btn.dataset.tab === 'system') refreshSystemInfo();
             if (btn.dataset.tab === 'offline') refreshQueueStats();
             if (btn.dataset.tab === 'power') refreshPowerStatus();
+            if (btn.dataset.tab === 'transcription') refreshProcessorStatus();
         });
     });
 }
@@ -444,14 +445,268 @@ function initEventListeners() {
 }
 
 // ==========================================================================
+// Transcription Functions
+// ==========================================================================
+
+let isRecording = false;
+let statusPollInterval = null;
+
+async function startRecording() {
+    const recordBtn = $('#btn-record');
+    const recordText = $('#record-btn-text');
+    const recordingStatus = $('#recording-status');
+    const recordingStatusText = $('#recording-status-text');
+
+    if (isRecording) {
+        showToast('Gravação já em andamento', 'warning');
+        return;
+    }
+
+    try {
+        const result = await apiPost('record/start', {});
+
+        if (result.success) {
+            isRecording = true;
+            recordBtn.classList.add('recording');
+            recordBtn.disabled = true;
+            recordText.textContent = 'Gravando...';
+            recordingStatus.classList.remove('hidden');
+            recordingStatusText.textContent = 'Gravando áudio...';
+
+            // Iniciar polling de status
+            startStatusPolling();
+
+            showToast('Gravação iniciada!', 'success');
+        } else {
+            throw new Error(result.error || 'Erro ao iniciar gravação');
+        }
+    } catch (error) {
+        console.error('Erro ao iniciar gravação:', error);
+        showToast('Erro: ' + error.message, 'error');
+        resetRecordingUI();
+    }
+}
+
+function startStatusPolling() {
+    // Poll a cada 500ms
+    statusPollInterval = setInterval(async () => {
+        try {
+            const result = await apiGet('processor/status');
+
+            if (result.success) {
+                const status = result.status;
+                const recordingStatusText = $('#recording-status-text');
+
+                if (status.is_recording) {
+                    recordingStatusText.textContent = 'Gravando áudio...';
+                } else if (status.is_processing) {
+                    recordingStatusText.textContent = 'Processando transcrição...';
+                } else if (status.current_transcription) {
+                    // Processamento concluído
+                    stopStatusPolling();
+                    resetRecordingUI();
+
+                    if (status.current_transcription.error) {
+                        showToast('Erro: ' + status.current_transcription.error, 'error');
+                    } else {
+                        displayTranscription(status.current_transcription);
+                        showToast('Transcrição concluída!', 'success');
+                        loadTranscriptionHistory();
+                    }
+                }
+
+                // Atualizar status do processador
+                updateProcessorStatus(result);
+            }
+        } catch (error) {
+            console.error('Erro no polling:', error);
+        }
+    }, 500);
+}
+
+function stopStatusPolling() {
+    if (statusPollInterval) {
+        clearInterval(statusPollInterval);
+        statusPollInterval = null;
+    }
+}
+
+function resetRecordingUI() {
+    isRecording = false;
+    const recordBtn = $('#btn-record');
+    const recordText = $('#record-btn-text');
+    const recordingStatus = $('#recording-status');
+
+    recordBtn.classList.remove('recording');
+    recordBtn.disabled = false;
+    recordText.textContent = 'Iniciar Gravação';
+    recordingStatus.classList.add('hidden');
+}
+
+function displayTranscription(data) {
+    const container = $('#current-transcription');
+    const textEl = $('#transcription-text');
+    const timestampEl = $('#trans-timestamp');
+    const durationEl = $('#trans-duration');
+    const timeEl = $('#trans-time');
+    const summaryContainer = $('#transcription-summary');
+    const summaryText = $('#summary-text');
+
+    container.classList.remove('hidden');
+
+    textEl.textContent = data.text || 'Nenhum texto transcrito';
+    timestampEl.textContent = data.timestamp || '';
+    durationEl.textContent = data.audio_duration ? `${data.audio_duration}s de áudio` : '';
+    timeEl.textContent = data.processing_time ? `${data.processing_time}s processamento` : '';
+
+    if (data.summary) {
+        summaryContainer.classList.remove('hidden');
+        summaryText.textContent = data.summary;
+    } else {
+        summaryContainer.classList.add('hidden');
+    }
+}
+
+async function loadTranscriptionHistory() {
+    try {
+        const result = await apiGet('transcriptions?limit=20');
+
+        if (result.success) {
+            renderHistory(result.transcriptions);
+            $('#proc-total').textContent = result.total || 0;
+        }
+    } catch (error) {
+        console.error('Erro ao carregar histórico:', error);
+    }
+}
+
+function renderHistory(transcriptions) {
+    const container = $('#transcription-history');
+
+    if (!transcriptions || transcriptions.length === 0) {
+        container.innerHTML = '<p class="empty-history">Nenhuma transcrição ainda.</p>';
+        return;
+    }
+
+    container.innerHTML = transcriptions.map(t => `
+        <div class="history-item" data-id="${t.id}" onclick="displayTranscription(${JSON.stringify(t).replace(/"/g, '&quot;')})">
+            <div class="history-item-header">
+                <span>${t.timestamp}</span>
+                <span>${t.audio_duration || 0}s | ${t.processing_time || 0}s</span>
+            </div>
+            <div class="history-item-text">${t.text || 'Sem texto'}</div>
+        </div>
+    `).join('');
+}
+
+async function clearTranscriptionHistory() {
+    if (!confirm('Tem certeza que deseja limpar o histórico?')) return;
+
+    try {
+        const response = await fetch('/api/transcriptions', { method: 'DELETE' });
+        const result = await response.json();
+
+        if (result.success) {
+            loadTranscriptionHistory();
+            $('#current-transcription').classList.add('hidden');
+            showToast('Histórico limpo!', 'success');
+        }
+    } catch (error) {
+        console.error('Erro ao limpar histórico:', error);
+        showToast('Erro ao limpar histórico', 'error');
+    }
+}
+
+async function uploadAudioFile() {
+    const input = $('#audio-upload');
+    const file = input.files[0];
+
+    if (!file) return;
+
+    $('#upload-filename').textContent = file.name;
+
+    const formData = new FormData();
+    formData.append('audio', file);
+
+    try {
+        showToast('Enviando arquivo...', 'info');
+
+        const response = await fetch('/api/transcribe', {
+            method: 'POST',
+            body: formData
+        });
+
+        const result = await response.json();
+
+        if (result.success) {
+            displayTranscription(result.transcription);
+            loadTranscriptionHistory();
+            showToast('Transcrição concluída!', 'success');
+        } else {
+            throw new Error(result.error || 'Erro na transcrição');
+        }
+    } catch (error) {
+        console.error('Erro no upload:', error);
+        showToast('Erro: ' + error.message, 'error');
+    }
+
+    input.value = '';
+    $('#upload-filename').textContent = '';
+}
+
+async function updateProcessorStatus(result) {
+    if (result && result.config) {
+        $('#proc-mode').textContent = result.config.mode || '-';
+        $('#proc-whisper').textContent = result.config.whisper_model || '-';
+        $('#proc-llm').textContent = result.config.llm_provider || '-';
+    }
+}
+
+async function refreshProcessorStatus() {
+    try {
+        const result = await apiGet('processor/status');
+        if (result.success) {
+            updateProcessorStatus(result);
+        }
+
+        // Também carregar histórico
+        loadTranscriptionHistory();
+    } catch (error) {
+        console.error('Erro ao obter status:', error);
+    }
+}
+
+// ==========================================================================
+// Transcription Event Listeners
+// ==========================================================================
+
+function initTranscriptionListeners() {
+    // Botão de gravação
+    $('#btn-record').addEventListener('click', startRecording);
+
+    // Botão de upload
+    $('#btn-upload').addEventListener('click', () => {
+        $('#audio-upload').click();
+    });
+
+    // Quando arquivo é selecionado
+    $('#audio-upload').addEventListener('change', uploadAudioFile);
+
+    // Limpar histórico
+    $('#btn-clear-history').addEventListener('click', clearTranscriptionHistory);
+}
+
+// ==========================================================================
 // Init
 // ==========================================================================
 
 document.addEventListener('DOMContentLoaded', () => {
     initTabs();
     initEventListeners();
+    initTranscriptionListeners();
     loadConfig();
 
     // Auto-refresh system info every 30s
     setInterval(refreshSystemInfo, 30000);
 });
+

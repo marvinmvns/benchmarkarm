@@ -26,6 +26,7 @@
             <button class="tab-btn" data-tab="offline">Offline</button>
             <button class="tab-btn" data-tab="power">Energia</button>
             <button class="tab-btn" data-tab="system">Sistema</button>
+            <button class="tab-btn" data-tab="transcription">📝 Transcrição</button>
         </nav>
 
         <!-- Content -->
@@ -342,6 +343,76 @@
                     <button type="button" id="btn-export" class="btn btn-secondary">📤 Exportar Config</button>
                     <button type="button" id="btn-import" class="btn btn-secondary">📥 Importar Config</button>
                     <button type="button" id="btn-reset" class="btn btn-danger">🔄 Resetar Padrões</button>
+                </div>
+            </section>
+
+            <!-- Transcription Tab -->
+            <section id="tab-transcription" class="tab-content">
+                <h2>📝 Transcrição de Voz</h2>
+
+                <!-- Controles de Gravação -->
+                <div class="transcription-controls">
+                    <button type="button" id="btn-record" class="btn btn-record">
+                        <span class="record-icon">🎙️</span>
+                        <span id="record-btn-text">Iniciar Gravação</span>
+                    </button>
+                    <div id="recording-status" class="recording-status hidden">
+                        <span class="pulse-dot"></span>
+                        <span id="recording-status-text">Gravando...</span>
+                    </div>
+                </div>
+
+                <!-- Resultado da Transcrição Atual -->
+                <div id="current-transcription" class="transcription-result hidden">
+                    <h3>Última Transcrição</h3>
+                    <div class="transcription-text-container">
+                        <div class="transcription-meta">
+                            <span id="trans-timestamp"></span>
+                            <span id="trans-duration"></span>
+                            <span id="trans-time"></span>
+                        </div>
+                        <div id="transcription-text" class="transcription-text"></div>
+                    </div>
+                    <div id="transcription-summary" class="transcription-summary hidden">
+                        <h4>📋 Resumo</h4>
+                        <p id="summary-text"></p>
+                    </div>
+                </div>
+
+                <!-- Upload de Áudio -->
+                <div class="upload-section">
+                    <h3>Ou envie um arquivo de áudio</h3>
+                    <div class="upload-area">
+                        <input type="file" id="audio-upload" accept="audio/*,.wav,.mp3,.ogg,.m4a" hidden>
+                        <button type="button" id="btn-upload" class="btn btn-secondary">
+                            📤 Enviar Arquivo de Áudio
+                        </button>
+                        <span id="upload-filename"></span>
+                    </div>
+                </div>
+
+                <!-- Histórico -->
+                <div class="history-section">
+                    <div class="history-header">
+                        <h3>📜 Histórico</h3>
+                        <button type="button" id="btn-clear-history" class="btn btn-secondary btn-small">
+                            🗑️ Limpar
+                        </button>
+                    </div>
+                    <div id="transcription-history" class="transcription-history">
+                        <p class="empty-history">Nenhuma transcrição ainda.</p>
+                    </div>
+                </div>
+
+                <!-- Status do Processador -->
+                <div class="status-card">
+                    <h3>Status do Processador</h3>
+                    <div id="processor-status">
+                        <p>Modo: <span id="proc-mode">-</span></p>
+                        <p>Modelo Whisper: <span id="proc-whisper">-</span></p>
+                        <p>LLM: <span id="proc-llm">-</span></p>
+                        <p>Total Transcrições: <span id="proc-total">0</span></p>
+                    </div>
                 </div>
             </section>
         </main>
