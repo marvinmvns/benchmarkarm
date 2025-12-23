@@ -670,12 +670,13 @@ class WebServer:
         return f"http://{self.host}:{self.port}"
 
 
-def run_standalone(config_path: Optional[str] = None, port: int = 8080):
+def run_standalone(config_path: Optional[str] = None, host: str = "0.0.0.0", port: int = 8080):
     """
     Executa servidor web standalone.
 
     Args:
         config_path: Caminho da configuração
+        host: Host para binding
         port: Porta do servidor
     """
     if not FLASK_AVAILABLE:
@@ -683,18 +684,20 @@ def run_standalone(config_path: Optional[str] = None, port: int = 8080):
         return
 
     app = create_app(config_path)
-    print(f"Iniciando interface web em http://0.0.0.0:{port}")
+    print(f"Iniciando interface web em http://{host}:{port}")
     print("Pressione Ctrl+C para parar")
 
-    app.run(host="0.0.0.0", port=port, debug=False, threaded=True)
+    app.run(host=host, port=port, debug=False, threaded=True)
 
 
 if __name__ == "__main__":
     import argparse
 
     parser = argparse.ArgumentParser(description="Interface Web do Voice Processor")
+    parser.add_argument("-H", "--host", default="0.0.0.0", help="Host para binding (default: 0.0.0.0)")
     parser.add_argument("-p", "--port", type=int, default=8080, help="Porta do servidor")
     parser.add_argument("-c", "--config", help="Caminho do arquivo de configuração")
 
     args = parser.parse_args()
-    run_standalone(config_path=args.config, port=args.port)
+    run_standalone(config_path=args.config, host=args.host, port=args.port)
+
