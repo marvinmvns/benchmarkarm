@@ -718,6 +718,217 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    # ==========================================================================
+    # Processamento em Lote
+    # ==========================================================================
+    
+    batch_processor = None
+    
+    def get_batch_processor():
+        """Obtém instância do batch processor."""
+        nonlocal batch_processor
+        if batch_processor is None:
+            try:
+                from ..utils.batch_processor import BatchProcessor
+                config = load_config()
+                usb_config = config.get("usb_receiver", {})
+                audio_dir = usb_config.get("save_directory", "~/audio-recordings")
+                batch_processor = BatchProcessor(
+                    audio_dir=audio_dir,
+                    config_path=config_path,
+                )
+            except Exception as e:
+                logger.error(f"Erro ao criar batch processor: {e}")
+                return None
+        return batch_processor
+
+    @app.route("/api/batch/status", methods=["GET"])
+    def batch_status():
+        """Retorna status do processador em lote."""
+        try:
+            processor = get_batch_processor()
+            if processor:
+                return jsonify({
+                    "success": True,
+                    "status": processor.status,
+                })
+            else:
+                return jsonify({
+                    "success": True,
+                    "status": {
+                        "running": False,
+                        "pending_files": 0,
+                        "error": "Processador não disponível",
+                    }
+                })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/batch/run", methods=["POST"])
+    def batch_run():
+        """Executa processamento em lote manualmente."""
+        try:
+            processor = get_batch_processor()
+            if processor:
+                # Executar em thread para não bloquear
+                def run_batch():
+                    processor.process_pending()
+                
+                thread = threading.Thread(target=run_batch, daemon=True)
+                thread.start()
+                
+                return jsonify({
+                    "success": True,
+                    "message": "Processamento iniciado",
+                    "pending_files": len(processor.get_pending_files()),
+                })
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": "Processador não disponível",
+                }), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/batch/start", methods=["POST"])
+    def batch_start():
+        """Inicia processamento periódico em background."""
+        try:
+            processor = get_batch_processor()
+            if processor:
+                processor.start()
+                return jsonify({
+                    "success": True,
+                    "message": "Processamento periódico iniciado",
+                })
+            else:
+                return jsonify({"error": "Processador não disponível"}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/batch/stop", methods=["POST"])
+    def batch_stop():
+        """Para processamento periódico."""
+        try:
+            processor = get_batch_processor()
+            if processor:
+                processor.stop()
+                return jsonify({
+                    "success": True,
+                    "message": "Processamento periódico parado",
+                })
+            else:
+                return jsonify({"success": True, "message": "Processador não ativo"})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # ==========================================================================
+    # Arquivos de Transcrição
+    # ==========================================================================
+
+    @app.route("/api/files/transcriptions", methods=["GET"])
+    def list_transcription_files():
+        """Lista arquivos de transcrição (.txt) salvos."""
+        try:
+            processor = get_batch_processor()
+            if processor:
+                files = processor.get_transcription_files()
+                pending = processor.get_pending_files()
+                return jsonify({
+                    "success": True,
+                    "files": [f.to_dict() for f in files],
+                    "total": len(files),
+                    "pending_wav": len(pending),
+                })
+            else:
+                return jsonify({
+                    "success": True,
+                    "files": [],
+                    "total": 0,
+                    "pending_wav": 0,
+                })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/files/transcriptions/<filename>", methods=["GET"])
+    def read_transcription_file(filename):
+        """Lê conteúdo de um arquivo de transcrição."""
+        try:
+            processor = get_batch_processor()
+            if processor:
+                content = processor.read_transcription(filename)
+                if content is not None:
+                    return jsonify({
+                        "success": True,
+                        "filename": filename,
+                        "content": content,
+                    })
+                else:
+                    return jsonify({"error": "Arquivo não encontrado"}), 404
+            else:
+                return jsonify({"error": "Processador não disponível"}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/files/transcriptions/<filename>", methods=["DELETE"])
+    def delete_transcription_file(filename):
+        """Deleta um arquivo de transcrição."""
+        try:
+            processor = get_batch_processor()
+            if processor:
+                if processor.delete_transcription(filename):
+                    return jsonify({
+                        "success": True,
+                        "message": f"Arquivo {filename} deletado",
+                    })
+                else:
+                    return jsonify({"error": "Arquivo não encontrado"}), 404
+            else:
+                return jsonify({"error": "Processador não disponível"}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/files/search", methods=["GET"])
+    def search_transcriptions():
+        """Busca texto nas transcrições."""
+        try:
+            query = request.args.get("q", "").lower()
+            if not query:
+                return jsonify({"error": "Query vazia"}), 400
+            
+            processor = get_batch_processor()
+            if not processor:
+                return jsonify({"error": "Processador não disponível"}), 400
+            
+            files = processor.get_transcription_files()
+            results = []
+            
+            for f in files:
+                content = processor.read_transcription(f.name)
+                if content and query in content.lower():
+                    # Encontrar trecho com o termo
+                    lines = content.split("\n")
+                    matching_lines = [
+                        line for line in lines 
+                        if query in line.lower() and not line.startswith("#")
+                    ]
+                    
+                    results.append({
+                        "filename": f.name,
+                        "created": f.created.isoformat(),
+                        "matches": len(matching_lines),
+                        "preview": matching_lines[0][:200] if matching_lines else "",
+                    })
+            
+            return jsonify({
+                "success": True,
+                "query": query,
+                "results": results,
+                "total": len(results),
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
     return app
 
 

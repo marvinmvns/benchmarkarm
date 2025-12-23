@@ -29,6 +29,7 @@
             <button class="tab-btn" data-tab="offline">Offline</button>
             <button class="tab-btn" data-tab="power">Energia</button>
             <button class="tab-btn" data-tab="usb-receiver">🎧 Escuta Contínua</button>
+            <button class="tab-btn" data-tab="files">📂 Arquivos</button>
             <button class="tab-btn" data-tab="system">Sistema</button>
             <button class="tab-btn" data-tab="transcription">📝 Transcrição</button>
         </nav>
@@ -461,6 +462,23 @@
                         </label>
                         <small>Quando habilitado, escuta e transcreve 24/7 automaticamente</small>
                     </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="usb_auto_start" name="usb_receiver.auto_start">
+                            <strong>🚀 Auto-Iniciar ao Abrir</strong>
+                        </label>
+                        <small>Inicia a escuta automaticamente quando a aplicação é aberta</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="usb_auto_process" name="usb_receiver.auto_process">
+                            <strong>🔄 Auto-Processar Arquivos</strong>
+                        </label>
+                        <small>Inicia o processamento em lote automaticamente (transcreve .wav → .txt, remove
+                            .wav)</small>
+                    </div>
                 </div>
 
                 <!-- Modo 2: USB Gadget -->
@@ -765,6 +783,81 @@
                     </div>
                 </div>
             </section>
+
+            <!-- Files Tab -->
+            <section id="tab-files" class="tab-content">
+                <h2>📂 Arquivos de Transcrição</h2>
+
+                <!-- Batch Processor Status -->
+                <div class="status-card">
+                    <h3>🔄 Processador em Lote</h3>
+                    <div id="batch-status">
+                        <p>Estado: <span id="batch-state" class="status-badge">Parado</span></p>
+                        <p>Arquivos pendentes (.wav): <span id="batch-pending">0</span></p>
+                        <p>Processados: <span id="batch-processed">0</span></p>
+                        <p>Falhas: <span id="batch-failed">0</span></p>
+                        <p>Última execução: <span id="batch-last-run">-</span></p>
+                        <p>Próxima execução: <span id="batch-next-run">-</span></p>
+                    </div>
+                    <div class="batch-controls">
+                        <button type="button" id="btn-batch-run" class="btn btn-primary">▶️ Processar Agora</button>
+                        <button type="button" id="btn-batch-start" class="btn btn-secondary">🔄 Iniciar
+                            Automático</button>
+                        <button type="button" id="btn-batch-stop" class="btn btn-secondary" disabled>⏹️ Parar
+                            Automático</button>
+                    </div>
+                </div>
+
+                <!-- Info Box -->
+                <div class="info-box">
+                    <p>💡 <strong>Como funciona:</strong></p>
+                    <p>1. Arquivos <code>.wav</code> são gravados em <code>~/audio-recordings</code></p>
+                    <p>2. O processador transcreve com Whisper e salva como <code>.txt</code></p>
+                    <p>3. Após sucesso, o arquivo <code>.wav</code> é removido para economizar espaço</p>
+                </div>
+
+                <!-- Search -->
+                <div class="files-search">
+                    <input type="text" id="files-search-input" placeholder="🔍 Buscar nas transcrições...">
+                    <button type="button" id="btn-files-search" class="btn btn-secondary">Buscar</button>
+                    <button type="button" id="btn-files-refresh" class="btn btn-secondary">🔄 Atualizar Lista</button>
+                </div>
+
+                <!-- Files List -->
+                <div class="files-list-container">
+                    <h3>📄 Transcrições Salvas</h3>
+                    <div id="files-list" class="files-list">
+                        <p class="empty-message">Carregando...</p>
+                    </div>
+                    <div class="files-footer">
+                        <span id="files-count">0 arquivos</span>
+                    </div>
+                </div>
+
+                <!-- Search Results -->
+                <div id="search-results" class="search-results" style="display: none;">
+                    <h3>🔍 Resultados da Busca</h3>
+                    <div id="search-results-list"></div>
+                    <button type="button" id="btn-clear-search" class="btn btn-secondary">Limpar Busca</button>
+                </div>
+            </section>
+
+            <!-- File View Modal -->
+            <div id="file-view-modal" class="modal" style="display: none;">
+                <div class="modal-content modal-large">
+                    <div class="modal-header">
+                        <h3 id="modal-filename">Arquivo</h3>
+                        <button type="button" class="modal-close" onclick="closeFileModal()">&times;</button>
+                    </div>
+                    <div class="modal-body">
+                        <pre id="modal-file-content" class="file-content"></pre>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" onclick="closeFileModal()">Fechar</button>
+                        <button type="button" id="btn-modal-delete" class="btn btn-danger">🗑️ Deletar</button>
+                    </div>
+                </div>
+            </div>
         </main>
 
         <!-- Footer Actions -->

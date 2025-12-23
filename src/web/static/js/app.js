@@ -191,6 +191,8 @@ function populateForm(cfg) {
     if (cfg.usb_receiver) {
         $('#usb_receiver_enabled').checked = cfg.usb_receiver.enabled !== false;
         $('#usb_continuous_listen').checked = cfg.usb_receiver.continuous_listen !== false;
+        $('#usb_auto_start').checked = cfg.usb_receiver.auto_start === true;
+        $('#usb_auto_process').checked = cfg.usb_receiver.auto_process === true;
         $('#usb_gadget_enabled').checked = cfg.usb_receiver.usb_gadget_enabled === true;
         $('#usb_save_directory').value = cfg.usb_receiver.save_directory || '~/audio-recordings';
         $('#usb_sample_rate').value = cfg.usb_receiver.sample_rate || 44100;
@@ -268,6 +270,8 @@ function collectFormValues() {
     if (!config.usb_receiver) config.usb_receiver = {};
     config.usb_receiver.enabled = $('#usb_receiver_enabled').checked;
     config.usb_receiver.continuous_listen = $('#usb_continuous_listen').checked;
+    config.usb_receiver.auto_start = $('#usb_auto_start').checked;
+    config.usb_receiver.auto_process = $('#usb_auto_process').checked;
     config.usb_receiver.usb_gadget_enabled = $('#usb_gadget_enabled').checked;
     config.usb_receiver.save_directory = $('#usb_save_directory').value;
     config.usb_receiver.sample_rate = parseInt($('#usb_sample_rate').value);
@@ -1178,6 +1182,359 @@ async function downloadLLMModel(model) {
 }
 
 // ==========================================================================
+// Batch Processor & Files Tab
+// ==========================================================================
+
+let currentViewingFile = null;
+
+async function refreshBatchStatus() {
+    try {
+        const result = await apiGet('batch/status');
+        if (result.success) {
+            updateBatchUI(result.status);
+        }
+    } catch (error) {
+        console.error('Erro ao obter status do batch:', error);
+    }
+}
+
+function updateBatchUI(status) {
+    const stateEl = $('#batch-state');
+    const pendingEl = $('#batch-pending');
+    const processedEl = $('#batch-processed');
+    const failedEl = $('#batch-failed');
+    const lastRunEl = $('#batch-last-run');
+    const nextRunEl = $('#batch-next-run');
+    const startBtn = $('#btn-batch-start');
+    const stopBtn = $('#btn-batch-stop');
+
+    if (stateEl) {
+        if (status.is_processing) {
+            stateEl.textContent = 'Processando...';
+            stateEl.className = 'status-badge running';
+        } else if (status.running) {
+            stateEl.textContent = 'Automático Ativo';
+            stateEl.className = 'status-badge running';
+        } else {
+            stateEl.textContent = 'Parado';
+            stateEl.className = 'status-badge stopped';
+        }
+    }
+
+    if (pendingEl) pendingEl.textContent = status.pending_files || 0;
+    if (processedEl) processedEl.textContent = status.processed_files || 0;
+    if (failedEl) failedEl.textContent = status.failed_files || 0;
+
+    if (lastRunEl) {
+        lastRunEl.textContent = status.last_run
+            ? new Date(status.last_run).toLocaleString('pt-BR')
+            : '-';
+    }
+
+    if (nextRunEl) {
+        nextRunEl.textContent = status.next_run
+            ? new Date(status.next_run).toLocaleString('pt-BR')
+            : '-';
+    }
+
+    if (startBtn && stopBtn) {
+        startBtn.disabled = status.running;
+        stopBtn.disabled = !status.running;
+    }
+}
+
+async function runBatchProcess() {
+    try {
+        const result = await apiPost('batch/run');
+        if (result.success) {
+            showToast('Processamento iniciado!', 'success');
+            // Poll for updates
+            setTimeout(refreshBatchStatus, 2000);
+            setTimeout(refreshBatchStatus, 5000);
+            setTimeout(refreshTranscriptionFiles, 5000);
+        } else {
+            showToast(result.error || 'Erro', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao executar batch:', error);
+        showToast('Erro ao executar processamento', 'error');
+    }
+}
+
+async function startBatchAutomatic() {
+    try {
+        const result = await apiPost('batch/start');
+        if (result.success) {
+            showToast('Processamento automático iniciado!', 'success');
+            refreshBatchStatus();
+        } else {
+            showToast(result.error || 'Erro', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao iniciar batch automático:', error);
+        showToast('Erro ao iniciar', 'error');
+    }
+}
+
+async function stopBatchAutomatic() {
+    try {
+        const result = await apiPost('batch/stop');
+        if (result.success) {
+            showToast('Processamento automático parado', 'info');
+            refreshBatchStatus();
+        }
+    } catch (error) {
+        console.error('Erro ao parar batch:', error);
+    }
+}
+
+async function refreshTranscriptionFiles() {
+    try {
+        const result = await apiGet('files/transcriptions');
+        if (result.success) {
+            renderFilesList(result.files);
+            $('#files-count').textContent = `${result.total} arquivos`;
+
+            // Também atualizar pendentes no batch status
+            if ($('#batch-pending')) {
+                $('#batch-pending').textContent = result.pending_wav || 0;
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao carregar arquivos:', error);
+        $('#files-list').innerHTML = '<p class="empty-message">Erro ao carregar arquivos</p>';
+    }
+}
+
+function renderFilesList(files) {
+    const container = $('#files-list');
+
+    if (!files || files.length === 0) {
+        container.innerHTML = '<p class="empty-message">Nenhuma transcrição salva ainda.</p>';
+        return;
+    }
+
+    container.innerHTML = files.map(f => `
+        <div class="file-item" data-name="${f.name}">
+            <div class="file-info">
+                <span class="file-name">📄 ${f.name}</span>
+                <span class="file-meta">
+                    ${new Date(f.created).toLocaleString('pt-BR')} | 
+                    ${formatBytes(f.size)}
+                    ${f.audio_duration ? ` | ${f.audio_duration.toFixed(1)}s áudio` : ''}
+                </span>
+            </div>
+            <div class="file-actions">
+                <button class="btn btn-small" onclick="viewFile('${f.name}')">👁️ Ver</button>
+                <button class="btn btn-small btn-danger" onclick="deleteFile('${f.name}')">🗑️</button>
+            </div>
+        </div>
+    `).join('');
+}
+
+async function viewFile(filename) {
+    try {
+        const result = await apiGet(`files/transcriptions/${encodeURIComponent(filename)}`);
+        if (result.success) {
+            currentViewingFile = filename;
+            $('#modal-filename').textContent = filename;
+            $('#modal-file-content').textContent = result.content;
+            $('#file-view-modal').style.display = 'flex';
+        } else {
+            showToast('Arquivo não encontrado', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao ler arquivo:', error);
+        showToast('Erro ao ler arquivo', 'error');
+    }
+}
+
+function closeFileModal() {
+    $('#file-view-modal').style.display = 'none';
+    currentViewingFile = null;
+}
+
+async function deleteFile(filename) {
+    if (!confirm(`Deletar ${filename}?`)) return;
+
+    try {
+        const response = await fetch(`/api/files/transcriptions/${encodeURIComponent(filename)}`, {
+            method: 'DELETE'
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            showToast('Arquivo deletado!', 'success');
+            refreshTranscriptionFiles();
+
+            // Fechar modal se era o arquivo sendo visualizado
+            if (currentViewingFile === filename) {
+                closeFileModal();
+            }
+        } else {
+            showToast(result.error || 'Erro ao deletar', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao deletar:', error);
+        showToast('Erro ao deletar arquivo', 'error');
+    }
+}
+
+async function searchTranscriptionFiles() {
+    const query = $('#files-search-input').value.trim();
+
+    if (!query) {
+        // Limpar busca, mostrar todos
+        $('#search-results').style.display = 'none';
+        refreshTranscriptionFiles();
+        return;
+    }
+
+    try {
+        const result = await apiGet(`files/search?q=${encodeURIComponent(query)}`);
+        if (result.success) {
+            renderSearchResults(result.results, query);
+        }
+    } catch (error) {
+        console.error('Erro na busca:', error);
+        showToast('Erro na busca', 'error');
+    }
+}
+
+function renderSearchResults(results, query) {
+    const container = $('#search-results');
+    const listEl = $('#search-results-list');
+
+    container.style.display = 'block';
+
+    if (!results || results.length === 0) {
+        listEl.innerHTML = `<p class="empty-message">Nenhum resultado para "${query}"</p>`;
+        return;
+    }
+
+    listEl.innerHTML = results.map(r => `
+        <div class="search-result-item" onclick="viewFile('${r.filename}')">
+            <div class="result-filename">📄 ${r.filename}</div>
+            <div class="result-meta">${new Date(r.created).toLocaleString('pt-BR')} | ${r.matches} ocorrências</div>
+            <div class="result-preview">${highlightQuery(r.preview, query)}</div>
+        </div>
+    `).join('');
+}
+
+function highlightQuery(text, query) {
+    if (!text || !query) return text || '';
+    const regex = new RegExp(`(${query})`, 'gi');
+    return text.replace(regex, '<mark>$1</mark>');
+}
+
+function clearFileSearch() {
+    $('#files-search-input').value = '';
+    $('#search-results').style.display = 'none';
+    refreshTranscriptionFiles();
+}
+
+function initFilesTab() {
+    // Botões de batch
+    const btnBatchRun = $('#btn-batch-run');
+    if (btnBatchRun) {
+        btnBatchRun.addEventListener('click', runBatchProcess);
+    }
+
+    const btnBatchStart = $('#btn-batch-start');
+    if (btnBatchStart) {
+        btnBatchStart.addEventListener('click', startBatchAutomatic);
+    }
+
+    const btnBatchStop = $('#btn-batch-stop');
+    if (btnBatchStop) {
+        btnBatchStop.addEventListener('click', stopBatchAutomatic);
+    }
+
+    // Busca
+    const btnSearch = $('#btn-files-search');
+    if (btnSearch) {
+        btnSearch.addEventListener('click', searchTranscriptionFiles);
+    }
+
+    const searchInput = $('#files-search-input');
+    if (searchInput) {
+        searchInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') {
+                searchTranscriptionFiles();
+            }
+        });
+    }
+
+    const btnClearSearch = $('#btn-clear-search');
+    if (btnClearSearch) {
+        btnClearSearch.addEventListener('click', clearFileSearch);
+    }
+
+    // Refresh
+    const btnRefresh = $('#btn-files-refresh');
+    if (btnRefresh) {
+        btnRefresh.addEventListener('click', () => {
+            refreshBatchStatus();
+            refreshTranscriptionFiles();
+        });
+    }
+
+    // Modal delete button
+    const btnModalDelete = $('#btn-modal-delete');
+    if (btnModalDelete) {
+        btnModalDelete.addEventListener('click', () => {
+            if (currentViewingFile) {
+                deleteFile(currentViewingFile);
+            }
+        });
+    }
+
+    // Fechar modal ao clicar fora
+    const modal = $('#file-view-modal');
+    if (modal) {
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                closeFileModal();
+            }
+        });
+    }
+
+    // Carregar dados iniciais
+    refreshBatchStatus();
+    refreshTranscriptionFiles();
+}
+
+// ==========================================================================
+// Auto-Start Feature
+// ==========================================================================
+
+async function checkAutoStart() {
+    try {
+        const result = await apiGet('config');
+        if (result && result.usb_receiver) {
+            const usbConfig = result.usb_receiver;
+
+            // Se auto_start está habilitado, iniciar escuta automaticamente
+            if (usbConfig.auto_start && usbConfig.enabled) {
+                console.log('🚀 Auto-start habilitado, iniciando escuta...');
+
+                // Iniciar escuta contínua
+                await startListener();
+
+                // Também iniciar batch processor se configurado
+                if (usbConfig.auto_process) {
+                    await startBatchAutomatic();
+                }
+
+                showToast('Escuta automática iniciada!', 'success');
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao verificar auto-start:', error);
+    }
+}
+
+// ==========================================================================
 // Init
 // ==========================================================================
 
@@ -1186,8 +1543,15 @@ document.addEventListener('DOMContentLoaded', () => {
     initEventListeners();
     initTranscriptionListeners();
     initListenerControls();
+    initFilesTab();
     loadConfig();
+
+    // Check auto-start after config is loaded
+    setTimeout(checkAutoStart, 1000);
 
     // Auto-refresh system info every 30s
     setInterval(refreshSystemInfo, 30000);
+
+    // Auto-refresh batch status every 60s
+    setInterval(refreshBatchStatus, 60000);
 });

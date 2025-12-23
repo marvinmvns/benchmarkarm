@@ -162,6 +162,8 @@ class USBReceiverConfig:
     keep_original_audio: bool = True                # Manter arquivo original após processar
     continuous_listen: bool = True                  # Escuta contínua por padrão
     usb_gadget_enabled: bool = False                # USB Gadget desabilitado por padrão (requer setup)
+    auto_start: bool = False                        # Auto-iniciar escuta ao abrir a aplicação
+    auto_process: bool = False                      # Auto-iniciar processamento em lote
 
 
 @dataclass
