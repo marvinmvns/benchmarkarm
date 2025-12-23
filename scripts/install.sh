@@ -367,6 +367,7 @@ sudo apt-get install -y -qq \
     libffi-dev \
     libasound2-dev \
     libatlas3-base \
+    libcurl4-openssl-dev \
     git \
     cmake \
     build-essential \
@@ -439,16 +440,16 @@ if [ ! -d "$LLAMA_CPP_DIR" ]; then
         log_info "Compilando llama.cpp para ARM..."
         mkdir -p build && cd build
         if $IS_PI_ZERO; then
-            cmake .. -DCMAKE_BUILD_TYPE=Release -DCMAKE_C_FLAGS="-mcpu=cortex-a53 -O3" -DCMAKE_CXX_FLAGS="-mcpu=cortex-a53 -O3"
+            cmake .. -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF -DCMAKE_C_FLAGS="-mcpu=cortex-a53 -O3" -DCMAKE_CXX_FLAGS="-mcpu=cortex-a53 -O3"
             make -j2
         else
-            cmake .. -DCMAKE_BUILD_TYPE=Release
+            cmake .. -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF
             make -j4
         fi
         cd ..
     else
         mkdir -p build && cd build
-        cmake .. -DCMAKE_BUILD_TYPE=Release
+        cmake .. -DCMAKE_BUILD_TYPE=Release -DLLAMA_CURL=OFF
         make -j$(nproc)
         cd ..
     fi
