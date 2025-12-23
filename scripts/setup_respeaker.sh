@@ -88,6 +88,7 @@ sudo apt-get install -y -qq \
 # Selecionar tipo de ReSpeaker (pode ser passado como argumento)
 # =============================================================================
 RESPEAKER_TYPE="${1:-}"
+USE_HINTAK=false
 
 if [ -z "$RESPEAKER_TYPE" ]; then
     echo ""
@@ -95,14 +96,21 @@ if [ -z "$RESPEAKER_TYPE" ]; then
     echo "  1) ReSpeaker 2-Mic Pi HAT V1.0"
     echo "  2) ReSpeaker 2-Mic Pi HAT V2.0 (mais comum)"
     echo "  3) ReSpeaker 4-Mic Array"
+    echo "  4) Usar driver HinTak/seeed-voicecard (recomendado para kernels novos)"
     echo ""
-    read -p "Escolha [1-3] (default: 2): " respeaker_choice
+    read -p "Escolha [1-4] (default: 2): " respeaker_choice
 
     case $respeaker_choice in
         1) RESPEAKER_TYPE="2mic-v1" ;;
         3) RESPEAKER_TYPE="4mic" ;;
+        4) RESPEAKER_TYPE="hintak"; USE_HINTAK=true ;;
         *) RESPEAKER_TYPE="2mic-v2" ;;
     esac
+fi
+
+# Se argumento for "hintak", usar fork HinTak diretamente
+if [ "$RESPEAKER_TYPE" = "hintak" ]; then
+    USE_HINTAK=true
 fi
 
 case $RESPEAKER_TYPE in
@@ -116,6 +124,11 @@ case $RESPEAKER_TYPE in
         OVERLAY_DTS="seeed-4mic-voicecard-overlay.dts"
         CARD_NAME="seeed4micvoicec"
         ;;
+    "hintak"|"4")
+        OVERLAY_NAME="seeed-2mic-voicecard"
+        CARD_NAME="seeed2micvoicec"
+        USE_HINTAK=true
+        ;;
     *)
         OVERLAY_NAME="respeaker-2mic-v2_0"
         OVERLAY_DTS="respeaker-2mic-v2_0-overlay.dts"
@@ -125,9 +138,33 @@ esac
 
 log_info "Configurando: $OVERLAY_NAME"
 
+# Se usar HinTak, pular para instalação direta
+if [ "$USE_HINTAK" = true ]; then
+    log_info "Usando driver HinTak/seeed-voicecard..."
+    
+    OVERLAY_DIR="/tmp/seeed-voicecard-hintak"
+    rm -rf "$OVERLAY_DIR"
+    
+    git clone --depth 1 https://github.com/HinTak/seeed-voicecard.git "$OVERLAY_DIR"
+    cd "$OVERLAY_DIR"
+    
+    log_info "Executando instalador..."
+    if sudo ./install.sh; then
+        log_success "Driver HinTak instalado com sucesso!"
+    else
+        log_error "Falha na instalação do driver HinTak!"
+        exit 1
+    fi
+    
+    # Pular para configuração ALSA
+    cd "$PROJECT_DIR" 2>/dev/null || cd ~
+fi
+
 # =============================================================================
-# Baixar e compilar Device Tree Overlay
+# Baixar e compilar Device Tree Overlay (apenas se não usar HinTak)
 # =============================================================================
+if [ "$USE_HINTAK" != "true" ]; then
+
 OVERLAY_DIR="/tmp/seeed-overlays"
 SKIP_COMPILE=false
 
@@ -233,6 +270,8 @@ if [ "$SKIP_COMPILE" != "true" ]; then
         fi
     fi
 fi
+
+fi  # Fim do bloco USE_HINTAK != true
 
 # =============================================================================
 # Configurar config.txt
