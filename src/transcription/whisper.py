@@ -285,9 +285,30 @@ class WhisperTranscriber:
             "--no-prints",  # Menos output
         ])
 
-        logger.debug(f"Executando: {' '.join(cmd)}")
+        logger.debug(f"Executando whisper.cpp: {' '.join(cmd)}")
 
         try:
+            # Verificar se executável existe
+            exe_path = Path(self.whisper_cpp_path)
+            if not exe_path.exists():
+                error_msg = f"Executável whisper.cpp não encontrado: {self.whisper_cpp_path}"
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
+            
+            # Verificar se modelo existe
+            if not model_path.exists():
+                error_msg = f"Modelo Whisper não encontrado: {model_path}"
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
+            
+            # Verificar se arquivo de áudio existe
+            if not Path(audio_path).exists():
+                error_msg = f"Arquivo de áudio não encontrado: {audio_path}"
+                logger.error(error_msg)
+                raise RuntimeError(error_msg)
+
+            logger.info(f"🎙️ Transcrevendo com whisper.cpp: modelo={self.model}, arquivo={Path(audio_path).name}")
+
             result = subprocess.run(
                 cmd,
                 capture_output=True,
@@ -296,8 +317,17 @@ class WhisperTranscriber:
             )
 
             if result.returncode != 0:
-                logger.error(f"Erro whisper.cpp: {result.stderr}")
-                raise RuntimeError(f"whisper.cpp falhou: {result.stderr}")
+                error_details = (
+                    f"whisper.cpp falhou (código {result.returncode})\n"
+                    f"  Executável: {self.whisper_cpp_path}\n"
+                    f"  Modelo: {model_path}\n"
+                    f"  Arquivo: {audio_path}\n"
+                    f"  Comando: {' '.join(cmd)}\n"
+                    f"  STDERR: {result.stderr or '(vazio)'}\n"
+                    f"  STDOUT: {result.stdout[:500] if result.stdout else '(vazio)'}"
+                )
+                logger.error(f"Erro whisper.cpp:\n{error_details}")
+                raise RuntimeError(f"whisper.cpp falhou:\n{error_details}")
 
             # Extrair texto do output
             text = result.stdout.strip()
@@ -310,12 +340,15 @@ class WhisperTranscriber:
             ]
             text = ' '.join(text_lines).strip()
 
+            logger.info(f"✅ Transcrição concluída: {len(text)} caracteres")
+
             return {
                 "text": text,
                 "language": language,
             }
 
         except subprocess.TimeoutExpired:
+            logger.error(f"Timeout na transcrição (>120s): {audio_path}")
             raise RuntimeError("Timeout na transcrição")
 
     def _transcribe_python(self, audio_path: str, language: str) -> dict:
