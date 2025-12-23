@@ -366,7 +366,7 @@ sudo apt-get install -y -qq \
     libsndfile1 \
     libffi-dev \
     libasound2-dev \
-    libatlas-base-dev \
+    libatlas3-base \
     git \
     cmake \
     build-essential \
