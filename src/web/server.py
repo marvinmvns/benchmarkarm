@@ -263,14 +263,11 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
     def get_config():
         """Retorna configuração atual."""
         config = load_config()
-        return jsonify(config)
+        resp = jsonify(config)
+        resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return resp
 
     @app.route("/api/config", methods=["POST"])
-    @app.after_request
-    def add_header(response):
-        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
-        return response
-
     def update_config():
         """Atualiza configuração."""
         try:
