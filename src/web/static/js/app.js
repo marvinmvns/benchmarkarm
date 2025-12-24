@@ -989,16 +989,7 @@ async function refreshListenerStatus() {
     }
 }
 
-async function refreshLiveTranscriptions() {
-    try {
-        const result = await apiGet('listener/segments?limit=10');
-        if (result.success) {
-            renderLiveTranscriptions(result.segments);
-        }
-    } catch (error) {
-        console.error('Erro ao obter transcrições:', error);
-    }
-}
+// Note: refreshLiveTranscriptions is defined below in the Transcription UI section
 
 function updateListenerUI(status) {
     const startBtn = $('#btn-listener-start');
