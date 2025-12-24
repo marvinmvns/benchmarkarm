@@ -995,33 +995,38 @@ class WhisperAPIClient:
         max_wait_time: Optional[float] = None,
     ) -> dict:
         """
-        Aguarda conclusão de um job (polling).
+        Aguarda conclusão de um job de transcrição com polling.
         
         Args:
             job_id: ID do job
             poll_interval: Intervalo entre verificações (segundos)
-            max_wait_time: Tempo máximo de espera (usa self.timeout se None)
+            max_wait_time: Tempo máximo de espera (padrão: 30 minutos)
             
         Returns:
             Dict com resultado completo da transcrição
         """
-        max_wait = max_wait_time or self.timeout
+        max_wait = max_wait_time or 1800.0  # 30 minutos de timeout padrão
         start_time = time.time()
         last_status = ""
+        not_found_retries = 0
+        max_not_found_retries = 5  # Permitir até 5 tentativas se job não for encontrado
         
-        logger.info(f"⏳ Aguardando conclusão do job {job_id}...")
+        logger.info(f"⏳ Aguardando conclusão do job {job_id}... (timeout: {max_wait}s)")
         
         while (time.time() - start_time) < max_wait:
             try:
                 status_data = self.get_job_status(job_id)
                 status = status_data.get('status', '')
+                not_found_retries = 0  # Reset contador se encontrou o job
                 
                 if status != last_status:
-                    logger.debug(f"📊 Status: {status}")
+                    logger.info(f"📊 Job status: {status}")
                     last_status = status
                 
                 if status == 'completed':
-                    logger.info("✅ Transcrição concluída com sucesso!")
+                    result = status_data.get('result', {})
+                    text = result.get('text', '')[:100]
+                    logger.info(f"✅ Transcrição concluída! Texto: {text}...")
                     return status_data
                 
                 if status == 'failed':
@@ -1031,18 +1036,29 @@ class WhisperAPIClient:
                 # Esperar antes de próxima verificação
                 time.sleep(poll_interval)
                 
-                # Aumentar intervalo progressivamente (até 10s)
-                poll_interval = min(poll_interval * 1.2, 10.0)
+                # Aumentar intervalo progressivamente (até 8s)
+                poll_interval = min(poll_interval * 1.3, 8.0)
                 
             except ValueError as e:
-                raise e
+                # Job não encontrado - pode ser temporário ou já expirou
+                not_found_retries += 1
+                elapsed = time.time() - start_time
+                
+                if not_found_retries > max_not_found_retries:
+                    logger.error(f"❌ Job {job_id} não encontrado após {not_found_retries} tentativas")
+                    raise e
+                
+                logger.warning(f"⚠️ Job não encontrado (tentativa {not_found_retries}/{max_not_found_retries}), aguardando...")
+                time.sleep(poll_interval * 2)  # Esperar mais tempo antes de tentar novamente
+                
             except RuntimeError as e:
                 raise e
             except Exception as e:
-                logger.warning(f"Erro no polling: {e}")
+                logger.warning(f"⚠️ Erro no polling: {e}")
                 time.sleep(poll_interval)
         
-        raise TimeoutError(f"Timeout após {max_wait}s aguardando conclusão")
+        elapsed = time.time() - start_time
+        raise TimeoutError(f"Timeout após {elapsed:.1f}s aguardando conclusão do job {job_id}")
     
     def transcribe(
         self,
