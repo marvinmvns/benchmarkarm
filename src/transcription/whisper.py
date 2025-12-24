@@ -1072,7 +1072,15 @@ class WhisperAPIClient:
             except ValueError as e:
                 # Job não encontrado - pode ser temporário ou já expirou
                 not_found_retries += 1
-                elapsed = time.time() - start_time
+                server_msg = f" em {server_url}" if server_url else ""
+                
+                if not_found_retries <= max_not_found_retries:
+                    logger.warning(
+                        f"⚠️ Job não encontrado{server_msg} (tentativa {not_found_retries}/{max_not_found_retries}), aguardando..."
+                    )
+                else:
+                    logger.error(f"❌ Job {job_id} perdido{server_msg} após {max_not_found_retries} tentativas.")
+                    raise
                 
                 if not_found_retries > max_not_found_retries:
                     logger.error(f"❌ Job {job_id} não encontrado após {not_found_retries} tentativas")
@@ -1140,6 +1148,9 @@ class WhisperAPIClient:
             server_url = upload_result.get('server_url')
             if not job_id:
                 raise RuntimeError("WhisperAPI não retornou jobId")
+            
+            # Pequeno delay para evitar race condition no servidor (job created vs job queryable)
+            time.sleep(1.0)
             
             # 2. Aguardar conclusão
             result = self.wait_for_completion(job_id, server_url=server_url)
