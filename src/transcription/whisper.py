@@ -701,6 +701,7 @@ class WhisperAPIClient:
     def __init__(
         self,
         base_url: str = "http://127.0.0.1:3001",
+        base_urls: Optional[List[str]] = None,
         language: str = "pt",
         timeout: int = 300,
         word_timestamps: bool = False,
@@ -708,34 +709,61 @@ class WhisperAPIClient:
         cleanup: bool = True,
     ):
         """
-        Inicializa o cliente WhisperAPI.
+        Inicializa o cliente WhisperAPI com suporte a Round Robin.
         
         Args:
-            base_url: URL base do servidor WhisperAPI
-            language: Idioma padrão para transcrição ('pt', 'en', 'auto', etc.)
-            timeout: Timeout máximo para aguardar transcrição (segundos)
-            word_timestamps: Se True, retorna timestamps por palavra
-            translate: Se True, traduz para inglês
-            cleanup: Se True, servidor limpa arquivos após processar
+            base_url: URL base primária (fallback)
+            base_urls: Lista de URLs para balanceamento de carga
+            language: Idioma padrão
+            timeout: Timeout máximo
+            ...
         """
-        self.base_url = base_url.rstrip("/")
+        # Configurar URLs
+        self.urls = base_urls or [base_url]
+        self.urls = [u.rstrip("/") for u in self.urls if u and u.strip()]
+        if not self.urls:
+            self.urls = ["http://127.0.0.1:3001"]
+            
+        self.base_url = self.urls[0] # Compatibilidade
+        
         self.language = language
         self.timeout = timeout
         self.word_timestamps = word_timestamps
         self.translate = translate
         self.cleanup = cleanup
-        self._http_client = None
-        logger.info(f"🌐 WhisperAPI inicializado: {self.base_url}")
+        
+        # Gerenciamento de clientes (Round Robin)
+        self._clients = {} # Cache: url -> httpx.Client
+        self._current_index = 0
+        self._lock = threading.Lock()
+        
+        self._http_client = None # Legado
+        logger.info(f"🌐 WhisperAPI inicializado com {len(self.urls)} servidores: {self.urls}")
     
+    def _get_client_for_url(self, url: str):
+        """Retorna ou cria client para uma URL específica."""
+        with self._lock:
+            if url not in self._clients:
+                import httpx
+                self._clients[url] = httpx.Client(
+                    base_url=url,
+                    timeout=60.0,
+                )
+            return self._clients[url]
+            
+    def _get_next_client(self):
+        """Retorna (client, url) usando Round Robin."""
+        with self._lock:
+            url = self.urls[self._current_index]
+            self._current_index = (self._current_index + 1) % len(self.urls)
+        
+        client = self._get_client_for_url(url)
+        return client, url
+
     def _get_client(self):
-        """Retorna cliente HTTP (lazy initialization)."""
-        if self._http_client is None:
-            import httpx
-            self._http_client = httpx.Client(
-                base_url=self.base_url,
-                timeout=60.0,
-            )
-        return self._http_client
+        """Retorna cliente padrão (compatibilidade)."""
+        client, _ = self._get_next_client()
+        return client
     
     # ==========================================================================
     # Health & Info Endpoints
@@ -864,20 +892,25 @@ class WhisperAPIClient:
     # Job Management
     # ==========================================================================
     
-    def get_job_status(self, job_id: str) -> dict:
+    def get_job_status(self, job_id: str, server_url: Optional[str] = None) -> dict:
         """
         Verifica status de um job específico.
         
         Args:
             job_id: ID do job retornado por transcribe()
+            server_url: URL do servidor (necessário se usar Round Robin)
             
         Returns:
             Dict com status ('pending', 'processing', 'completed', 'failed'),
             result (se completed), error (se failed)
         """
         try:
-            client = self._get_client()
-            response = client.get(f"/status/{job_id}")
+            if server_url:
+                client = self._get_client_for_url(server_url)
+            else:
+                client = self._get_client()
+                
+            response = client.get(f"/status/{job_id}", timeout=10.0)
             if response.status_code == 404:
                 raise ValueError(f"Job não encontrado: {job_id}")
             response.raise_for_status()
@@ -933,16 +966,6 @@ class WhisperAPIClient:
     ) -> dict:
         """
         Envia arquivo de áudio para transcrição (não bloqueia).
-        
-        Args:
-            audio_path: Caminho do arquivo de áudio
-            language: Idioma ('pt', 'en', 'auto', etc.)
-            translate: Se True, traduz para inglês
-            word_timestamps: Se True, retorna timestamps por palavra
-            cleanup: Se True, servidor limpa arquivo após processar
-            
-        Returns:
-            Dict com jobId e estimatedWaitTime
         """
         if not os.path.exists(audio_path):
             raise FileNotFoundError(f"Arquivo não encontrado: {audio_path}")
@@ -954,7 +977,8 @@ class WhisperAPIClient:
         cleanup = cleanup if cleanup is not None else self.cleanup
         
         try:
-            client = self._get_client()
+            # Round Robin: Escolher próximo servidor
+            client, server_url = self._get_next_client()
             
             with open(audio_path, 'rb') as f:
                 files = {'audio': (Path(audio_path).name, f, 'audio/wav')}
@@ -965,7 +989,7 @@ class WhisperAPIClient:
                     'cleanup': str(cleanup).lower(),
                 }
                 
-                logger.info(f"📤 Enviando áudio: {Path(audio_path).name}")
+                logger.info(f"📤 Enviando áudio para {server_url}: {Path(audio_path).name}")
                 
                 response = client.post(
                     "/transcribe",
@@ -979,7 +1003,10 @@ class WhisperAPIClient:
             job_id = result.get('jobId')
             estimated_wait = result.get('estimatedWaitTime', 0)
             
-            logger.info(f"✅ Upload OK! Job ID: {job_id}, Espera: {estimated_wait}s")
+            logger.info(f"✅ Upload OK! Job ID: {job_id} em {server_url}")
+            
+            # Adicionar URL do servidor ao resultado para referência futura
+            result['server_url'] = server_url
             
             return result
             
@@ -993,6 +1020,7 @@ class WhisperAPIClient:
         job_id: str,
         poll_interval: float = 3.0,
         max_wait_time: Optional[float] = None,
+        server_url: Optional[str] = None,
     ) -> dict:
         """
         Aguarda conclusão de um job de transcrição com polling.
@@ -1001,6 +1029,7 @@ class WhisperAPIClient:
             job_id: ID do job
             poll_interval: Intervalo entre verificações (segundos)
             max_wait_time: Tempo máximo de espera (padrão: 30 minutos)
+            server_url: URL do servidor (necessário se usar Round Robin)
             
         Returns:
             Dict com resultado completo da transcrição
@@ -1011,11 +1040,11 @@ class WhisperAPIClient:
         not_found_retries = 0
         max_not_found_retries = 10  # Aumentado para 10 retries se job inconsistente
         
-        logger.info(f"⏳ Aguardando conclusão do job {job_id}... (timeout: {max_wait}s)")
+        logger.info(f"⏳ Aguardando conclusão do job {job_id} em {server_url or 'default'}... (timeout: {max_wait}s)")
         
         while (time.time() - start_time) < max_wait:
             try:
-                status_data = self.get_job_status(job_id)
+                status_data = self.get_job_status(job_id, server_url=server_url)
                 status = status_data.get('status', '')
                 not_found_retries = 0  # Reset contador se encontrou o job
                 
@@ -1107,11 +1136,12 @@ class WhisperAPIClient:
             )
             
             job_id = upload_result.get('jobId')
+            server_url = upload_result.get('server_url')
             if not job_id:
                 raise RuntimeError("WhisperAPI não retornou jobId")
             
             # 2. Aguardar conclusão
-            result = self.wait_for_completion(job_id)
+            result = self.wait_for_completion(job_id, server_url=server_url)
             
             # 3. Extrair resultado
             result_data = result.get('result', {})
@@ -1189,6 +1219,7 @@ def get_transcriber(config: dict) -> "WhisperTranscriber | WhisperAPIClient":
     if provider == 'whisperapi':
         return WhisperAPIClient(
             base_url=config.get('whisperapi_url', 'http://127.0.0.1:3001'),
+            base_urls=config.get('whisperapi_urls', []),
             language=config.get('language', 'pt'),
             timeout=config.get('whisperapi_timeout', 300),
         )

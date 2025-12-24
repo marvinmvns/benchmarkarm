@@ -171,6 +171,9 @@ function populateForm(cfg) {
         if (cfg.whisper.whisperapi_url) {
             $('#whisperapi_url').value = cfg.whisper.whisperapi_url;
         }
+        if (cfg.whisper.whisperapi_urls && Array.isArray(cfg.whisper.whisperapi_urls)) {
+            $('#whisperapi_urls').value = cfg.whisper.whisperapi_urls.join('\n');
+        }
         if (cfg.whisper.whisperapi_timeout) {
             $('#whisperapi_timeout').value = cfg.whisper.whisperapi_timeout;
         }
@@ -324,6 +327,15 @@ function collectFormValues() {
     config.whisper.stream_mode = $('#whisper_stream_mode').checked;
     config.whisper.openai_api_key = $('#whisper_openai_api_key').value;
     config.whisper.whisperapi_url = $('#whisperapi_url').value;
+
+    const urlsText = $('#whisperapi_urls').value;
+    if (urlsText) {
+        config.whisper.whisperapi_urls = urlsText.split('\n')
+            .map(u => u.trim())
+            .filter(u => u.length > 0);
+    } else {
+        config.whisper.whisperapi_urls = [];
+    }
     config.whisper.whisperapi_timeout = parseInt($('#whisperapi_timeout').value);
 
     // LLM

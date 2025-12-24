@@ -121,6 +121,7 @@ class BatchProcessor:
                     'stream_mode': getattr(whisper_config, 'stream_mode', False),
                     # WhisperAPI settings - use correct config attribute names
                     'whisperapi_url': getattr(whisper_config, 'whisperapi_url', 'http://127.0.0.1:3001'),
+                    'whisperapi_urls': getattr(whisper_config, 'whisperapi_urls', []),
                     'whisperapi_timeout': getattr(whisper_config, 'whisperapi_timeout', 300),
                 }
 

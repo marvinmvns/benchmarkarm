@@ -310,6 +310,15 @@
                     </div>
 
                     <div class="form-group">
+                        <label for="whisperapi_urls">🔄 Servidores Adicionais (Round Robin)</label>
+                        <textarea id="whisperapi_urls" class="form-control" rows="3"
+                            placeholder="http://192.168.1.102:3001&#10;http://192.168.1.103:3001"
+                            style="width: 100%; border: 1px solid var(--border); border-radius: 6px; padding: 10px; background: var(--bg-card); color: var(--text);"></textarea>
+                        <small>Adicione URLs extras para balanceamento de carga (uma por linha). O sistema irá alternar
+                            entre a URL principal e estas URLs.</small>
+                    </div>
+
+                    <div class="form-group">
                         <label for="whisperapi_timeout">Timeout (segundos)</label>
                         <input type="number" id="whisperapi_timeout" name="whisper.whisperapi_timeout" min="30"
                             max="600" value="300">

@@ -67,6 +67,7 @@ class WhisperConfig:
     openai_model: str = "whisper-1"
     # WhisperAPI (servidor externo)
     whisperapi_url: str = "http://127.0.0.1:3001"
+    whisperapi_urls: list[str] = field(default_factory=list)  # Lista de URLs para Round Robin
     whisperapi_timeout: int = 300            # Timeout em segundos
 
 

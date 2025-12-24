@@ -128,6 +128,8 @@ body {
 
 .tab-content.active {
     display: block;
+    padding-bottom: 80px;
+    /* Evita sobreposição do footer */
 }
 
 .tab-content h2 {
