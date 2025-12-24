@@ -2058,6 +2058,7 @@ async function testLivePipeline() {
     const btn = $('#btn-test-live');
     const resultDiv = $('#live-test-result');
     const originalText = btn.textContent;
+    const includeLLM = $('#test-include-llm').checked;
 
     try {
         btn.textContent = '🎙️ Gravando (5s)...';
@@ -2066,20 +2067,32 @@ async function testLivePipeline() {
 
         if (isDirty) await saveConfig();
 
-        const response = await apiPost('test/live', { duration: 5.0 });
+        // Wait for config save
+        await new Promise(r => setTimeout(r, 200));
+
+        const response = await apiPost('test/live', {
+            duration: 5.0,
+            generate_summary: includeLLM
+        });
+
+        btn.textContent = '⚙️ Processando...';
 
         if (response.success) {
             showToast('Teste concluído!', 'success');
             resultDiv.style.display = 'block';
             resultDiv.style.color = '#e2e8f0';
-            resultDiv.innerHTML = `
-                <strong>Transcrição:</strong><br>${response.text}<br><br>
-                <strong>Resumo:</strong><br>${response.summary}<br><br>
-                <small style="color:#888">
+
+            let html = `<strong>Transcrição:</strong><br>${response.text}<br><br>`;
+            if (response.summary && response.summary !== "(Ignorado)") {
+                html += `<strong>Resumo:</strong><br>${response.summary}<br><br>`;
+            }
+
+            html += `<small style="color:#888">
                     Processamento: ${response.stats.transcription.processing_time.toFixed(2)}s | 
                     LLM: ${response.stats.summary_time ? response.stats.summary_time.toFixed(2) : '0.00'}s
-                </small>
-            `;
+                </small>`;
+
+            resultDiv.innerHTML = html;
         } else {
             throw new Error(response.error);
         }

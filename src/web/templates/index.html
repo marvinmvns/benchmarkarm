@@ -436,738 +436,740 @@
                     </div>
                 </div>
 
-                <div class="form-group" style="margin-top: 20px; border-top: 1px dashed #444; padding-top: 15px;">
-                    <h3>Teste de Pipeline (Ao Vivo)</h3>
-                    <p class="force-small">Grava 5s do microfone, transcreve e resume usando a configuração atual.</p>
-                    <button type="button" class="btn btn-warning" onclick="testLivePipeline()" id="btn-test-live">
-                        🎙️ Gravar e Testar (5s)
-                    </button>
-                    <div id="live-test-result"
-                        style="margin-top: 10px; font-family: monospace; font-size: 0.9em; display: none; padding: 10px; background: #222; border-radius: 4px;">
+    </div>
+    </section>
+
+    <!-- Models Tab -->
+    <section id="tab-models" class="tab-content">
+        <h2>📦 Gerenciador de Modelos</h2>
+
+        <!-- Whisper Models -->
+        <div class="config-section">
+            <h3>🎙️ Modelos Whisper (Transcrição)</h3>
+            <p class="section-description">Modelos para transcrição de áudio. Modelos menores são mais rápidos
+                mas menos precisos.</p>
+
+            <div id="whisper-models" class="models-grid">
+                <div class="model-card" data-model="tiny">
+                    <div class="model-header">
+                        <span class="model-name">tiny</span>
+                        <span class="model-size">~75 MB</span>
                     </div>
-                </div>
-            </section>
-
-            <!-- Models Tab -->
-            <section id="tab-models" class="tab-content">
-                <h2>📦 Gerenciador de Modelos</h2>
-
-                <!-- Whisper Models -->
-                <div class="config-section">
-                    <h3>🎙️ Modelos Whisper (Transcrição)</h3>
-                    <p class="section-description">Modelos para transcrição de áudio. Modelos menores são mais rápidos
-                        mas menos precisos.</p>
-
-                    <div id="whisper-models" class="models-grid">
-                        <div class="model-card" data-model="tiny">
-                            <div class="model-header">
-                                <span class="model-name">tiny</span>
-                                <span class="model-size">~75 MB</span>
-                            </div>
-                            <p class="model-desc">Mais rápido, menos preciso. Ideal para Pi Zero.</p>
-                            <div class="model-actions">
-                                <span class="model-status" id="whisper-tiny-status">❓</span>
-                                <button class="btn btn-small" onclick="downloadWhisperModel('tiny')">📥 Baixar</button>
-                            </div>
-                        </div>
-
-                        <div class="model-card" data-model="base">
-                            <div class="model-header">
-                                <span class="model-name">base</span>
-                                <span class="model-size">~142 MB</span>
-                            </div>
-                            <p class="model-desc">Bom equilíbrio velocidade/precisão.</p>
-                            <div class="model-actions">
-                                <span class="model-status" id="whisper-base-status">❓</span>
-                                <button class="btn btn-small" onclick="downloadWhisperModel('base')">📥 Baixar</button>
-                            </div>
-                        </div>
-
-                        <div class="model-card" data-model="small">
-                            <div class="model-header">
-                                <span class="model-name">small</span>
-                                <span class="model-size">~466 MB</span>
-                            </div>
-                            <p class="model-desc">Mais preciso, mais lento.</p>
-                            <div class="model-actions">
-                                <span class="model-status" id="whisper-small-status">❓</span>
-                                <button class="btn btn-small" onclick="downloadWhisperModel('small')">📥 Baixar</button>
-                            </div>
-                        </div>
+                    <p class="model-desc">Mais rápido, menos preciso. Ideal para Pi Zero.</p>
+                    <div class="model-actions">
+                        <span class="model-status" id="whisper-tiny-status">❓</span>
+                        <button class="btn btn-small" onclick="downloadWhisperModel('tiny')">📥 Baixar</button>
                     </div>
                 </div>
 
-                <!-- LLM Models -->
-                <div class="config-section">
-                    <h3>🤖 Modelos LLM (Resumo/Chat)</h3>
-                    <p class="section-description">Modelos de linguagem para gerar resumos. Precisam de mais RAM/swap.
-                    </p>
-
-                    <div id="llm-models" class="models-grid">
-                        <div class="model-card" data-model="tinyllama">
-                            <div class="model-header">
-                                <span class="model-name">TinyLlama 1.1B</span>
-                                <span class="model-size">~670 MB</span>
-                            </div>
-                            <p class="model-desc">Modelo pequeno, funciona no Pi Zero com swap.</p>
-                            <div class="model-actions">
-                                <span class="model-status" id="llm-tinyllama-status">❓</span>
-                                <button class="btn btn-small" onclick="downloadLLMModel('tinyllama')">📥 Baixar</button>
-                            </div>
-                        </div>
-
-                        <div class="model-card" data-model="phi2">
-                            <div class="model-header">
-                                <span class="model-name">Phi-2 2.7B</span>
-                                <span class="model-size">~1.6 GB</span>
-                            </div>
-                            <p class="model-desc">Mais capaz, requer mais recursos.</p>
-                            <div class="model-actions">
-                                <span class="model-status" id="llm-phi2-status">❓</span>
-                                <button class="btn btn-small" onclick="downloadLLMModel('phi2')">📥 Baixar</button>
-                            </div>
-                        </div>
-
-                        <div class="model-card" data-model="gemma2b">
-                            <div class="model-header">
-                                <span class="model-name">Gemma 2B</span>
-                                <span class="model-size">~1.5 GB</span>
-                            </div>
-                            <p class="model-desc">Google Gemma, boa qualidade.</p>
-                            <div class="model-actions">
-                                <span class="model-status" id="llm-gemma2b-status">❓</span>
-                                <button class="btn btn-small" onclick="downloadLLMModel('gemma2b')">📥 Baixar</button>
-                            </div>
-                        </div>
+                <div class="model-card" data-model="base">
+                    <div class="model-header">
+                        <span class="model-name">base</span>
+                        <span class="model-size">~142 MB</span>
+                    </div>
+                    <p class="model-desc">Bom equilíbrio velocidade/precisão.</p>
+                    <div class="model-actions">
+                        <span class="model-status" id="whisper-base-status">❓</span>
+                        <button class="btn btn-small" onclick="downloadWhisperModel('base')">📥 Baixar</button>
                     </div>
                 </div>
 
-                <!-- Download Progress -->
-                <div id="download-progress" class="status-card" style="display: none;">
-                    <h3>⏳ Download em Progresso</h3>
-                    <div class="progress-bar">
-                        <div class="progress-fill" id="download-progress-fill" style="width: 0%"></div>
+                <div class="model-card" data-model="small">
+                    <div class="model-header">
+                        <span class="model-name">small</span>
+                        <span class="model-size">~466 MB</span>
                     </div>
-                    <p id="download-progress-text">Iniciando...</p>
-                </div>
-
-                <!-- Refresh Button -->
-                <div style="margin-top: 16px;">
-                    <button class="btn btn-secondary" onclick="refreshModelStatus()">🔄 Atualizar Status</button>
-                </div>
-            </section>
-
-            <!-- Offline Queue Tab -->
-            <section id="tab-offline" class="tab-content">
-                <h2>Fila Offline</h2>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="offline_enabled" name="offline_queue.enabled" checked>
-                        Habilitar Fila Offline
-                    </label>
-                    <small>Armazena tarefas quando sem internet</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="max_queue_size">Tamanho Máximo da Fila</label>
-                    <input type="number" id="max_queue_size" name="offline_queue.max_queue_size" min="100" max="10000"
-                        value="1000">
-                </div>
-
-                <div class="form-group">
-                    <label for="retry_delay">Delay Base para Retry (s)</label>
-                    <input type="number" id="retry_delay" name="offline_queue.retry_delay_base" min="10" max="300"
-                        value="30">
-                </div>
-
-                <div class="form-group">
-                    <label for="max_retries">Máximo de Retries</label>
-                    <input type="number" id="max_retries" name="offline_queue.max_retries" min="1" max="10" value="3">
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="use_local_fallback" name="offline_queue.use_local_fallback" checked>
-                        Usar LLM Local como Fallback
-                    </label>
-                </div>
-
-                <div class="status-card">
-                    <h3>Status da Fila</h3>
-                    <div id="queue-stats">
-                        <p>Pendentes: <span id="queue-pending">-</span></p>
-                        <p>Processando: <span id="queue-processing">-</span></p>
-                        <p>Concluídos: <span id="queue-completed">-</span></p>
-                        <p>Conectividade: <span id="queue-online">-</span></p>
-                    </div>
-                    <button type="button" id="btn-refresh-queue" class="btn btn-secondary">🔄 Atualizar</button>
-                </div>
-            </section>
-
-            <!-- Power Management Tab -->
-            <section id="tab-power" class="tab-content">
-                <h2>Gerenciamento de Energia</h2>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="power_enabled" name="power_management.enabled">
-                        <strong>Habilitar Gerenciamento de Energia</strong>
-                    </label>
-                    <small>Feature toggle - controla consumo de energia</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="power_mode">Modo Padrão</label>
-                    <select id="power_mode" name="power_management.default_mode">
-                        <option value="performance">Performance (~1800mW)</option>
-                        <option value="balanced">Equilibrado (~1200mW)</option>
-                        <option value="power_save">Economia (~800mW)</option>
-                        <option value="ultra_power_save">Ultra Economia (~500mW)</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="power_auto_adjust" name="power_management.auto_adjust" checked>
-                        Ajuste Automático
-                    </label>
-                    <small>Ajusta baseado em atividade e temperatura</small>
-                </div>
-
-                <div class="form-group">
-                    <label for="idle_timeout">Timeout para Idle (s)</label>
-                    <input type="number" id="idle_timeout" name="power_management.idle_timeout" min="30" max="600"
-                        value="60">
-                </div>
-
-                <div class="form-group">
-                    <label for="temp_high">Temperatura Alta (°C)</label>
-                    <input type="number" id="temp_high" name="power_management.thermal.threshold_high" min="50" max="80"
-                        value="70">
-                </div>
-
-                <div class="form-group">
-                    <label for="temp_critical">Temperatura Crítica (°C)</label>
-                    <input type="number" id="temp_critical" name="power_management.thermal.threshold_critical" min="60"
-                        max="90" value="80">
-                </div>
-
-                <div class="status-card">
-                    <h3>Status de Energia</h3>
-                    <div id="power-stats">
-                        <p>Modo Atual: <span id="power-current-mode">-</span></p>
-                        <p>Temperatura: <span id="power-temp">-</span></p>
-                        <p>Idle: <span id="power-idle">-</span></p>
-                    </div>
-                </div>
-            </section>
-
-            <!-- USB Receiver Tab -->
-            <section id="tab-usb-receiver" class="tab-content">
-                <h2>🎧 Escuta Contínua & Transcrição</h2>
-
-                <div class="info-box">
-                    <p>💡 <strong>O Raspberry Pi pode escutar e transcrever áudio automaticamente de duas
-                            formas:</strong></p>
-                    <p>1. <strong>ReSpeaker HAT</strong> - Usa o microfone local para capturar áudio</p>
-                    <p>2. <strong>USB Gadget</strong> - Recebe áudio de um PC conectado via USB</p>
-                </div>
-
-                <!-- Modo 1: ReSpeaker (Microfone Local) -->
-                <div class="config-section">
-                    <h3>🎙️ Modo 1: ReSpeaker HAT (Microfone Local)</h3>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="usb_receiver_enabled" name="usb_receiver.enabled" checked>
-                            <strong>Habilitar Escuta via ReSpeaker</strong>
-                        </label>
-                        <small>Usa o microfone do ReSpeaker HAT para capturar áudio ambiente</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="usb_continuous_listen" name="usb_receiver.continuous_listen"
-                                checked>
-                            <strong>Escuta Contínua Automática</strong>
-                        </label>
-                        <small>Quando habilitado, escuta e transcreve 24/7 automaticamente</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="usb_auto_start" name="usb_receiver.auto_start">
-                            <strong>🚀 Auto-Iniciar ao Abrir</strong>
-                        </label>
-                        <small>Inicia a escuta automaticamente quando a aplicação é aberta</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="usb_auto_process" name="usb_receiver.auto_process">
-                            <strong>🔄 Auto-Processar Arquivos</strong>
-                        </label>
-                        <small>Inicia o processamento em lote automaticamente (transcreve .wav → .txt, remove
-                            .wav)</small>
-                    </div>
-                </div>
-
-                <!-- Modo 2: USB Gadget -->
-                <div class="config-section">
-                    <h3>🔌 Modo 2: USB Gadget (Áudio via USB)</h3>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="usb_gadget_enabled" name="usb_receiver.usb_gadget_enabled">
-                            <strong>Habilitar USB Gadget</strong>
-                        </label>
-                        <small>⚠️ Transforma o Pi em placa de som USB. Requer:
-                            <code>sudo ./scripts/setup_usb_gadget.sh</code></small>
-                    </div>
-                </div>
-
-                <!-- Controles de Escuta -->
-                <div class="status-card">
-                    <h3>🎛️ Controles de Escuta</h3>
-
-                    <div class="listener-controls">
-                        <button type="button" id="btn-listener-start" class="btn btn-primary">
-                            ▶️ Iniciar Escuta
-                        </button>
-                        <button type="button" id="btn-listener-pause" class="btn btn-secondary" disabled>
-                            ⏸️ Pausar
-                        </button>
-                        <button type="button" id="btn-listener-stop" class="btn btn-danger" disabled>
-                            ⏹️ Parar
-                        </button>
-                    </div>
-
-                    <div id="listener-status" class="listener-status">
-                        <p>Estado: <span id="listener-state" class="status-badge">Parado</span></p>
-                        <p>Segmentos transcritos: <span id="listener-segments-count">0</span></p>
-                    </div>
-                </div>
-                <!-- Transcrições em Tempo Real -->
-                <div class="status-card transcriptions-panel">
-                    <div class="panel-header">
-                        <h3>📝 Transcrições em Tempo Real</h3>
-                        <div class="panel-actions">
-                            <button type="button" id="btn-export-json" class="btn btn-small" title="Exportar JSON">
-                                📥 JSON
-                            </button>
-                            <button type="button" id="btn-export-txt" class="btn btn-small" title="Exportar TXT">
-                                📄 TXT
-                            </button>
-                            <button type="button" id="btn-clear-segments" class="btn btn-small btn-danger"
-                                title="Limpar">
-                                🗑️
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Filtros e Busca -->
-                    <div class="transcription-filters">
-                        <div class="search-box">
-                            <input type="text" id="transcription-search" placeholder="🔍 Buscar nas transcrições...">
-                        </div>
-                        <div class="filter-options">
-                            <label class="filter-item">
-                                <input type="checkbox" id="filter-with-summary" checked>
-                                Com resumo
-                            </label>
-                            <select id="filter-duration">
-                                <option value="">Todas durações</option>
-                                <option value="short">Curtas (&lt; 10s)</option>
-                                <option value="medium">Médias (10-60s)</option>
-                                <option value="long">Longas (&gt; 60s)</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    <!-- Lista de Transcrições -->
-                    <div id="live-transcriptions" class="live-transcriptions">
-                        <p class="empty-message">Nenhuma transcrição ainda. Inicie a escuta para ver as transcrições
-                            em
-                            tempo real.</p>
-                    </div>
-
-                    <!-- Controles Inferiores -->
-                    <div class="transcription-footer">
-                        <span id="transcription-count">0 transcrições</span>
-                        <button type="button" id="btn-refresh-transcriptions" class="btn btn-secondary">
-                            🔄 Atualizar
-                        </button>
-                        <button type="button" id="btn-load-more" class="btn btn-secondary" disabled>
-                            📜 Carregar mais
-                        </button>
-                    </div>
-                </div>
-
-                <div id="usb-receiver-config" class="config-section">
-                    <h3>Configurações de Gravação</h3>
-
-                    <div class="form-group">
-                        <label for="usb_save_directory">Diretório de Gravações</label>
-                        <input type="text" id="usb_save_directory" name="usb_receiver.save_directory"
-                            value="~/audio-recordings">
-                        <small>Onde os arquivos de áudio serão salvos</small>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="usb_sample_rate">Taxa de Amostragem</label>
-                        <select id="usb_sample_rate" name="usb_receiver.sample_rate">
-                            <option value="44100">44100 Hz (CD Quality)</option>
-                            <option value="48000">48000 Hz (DVD Quality)</option>
-                            <option value="16000">16000 Hz (Otimizado Whisper)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="usb_channels">Canais</label>
-                        <select id="usb_channels" name="usb_receiver.channels">
-                            <option value="2">Stereo (2 canais)</option>
-                            <option value="1">Mono (1 canal)</option>
-                        </select>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="usb_max_duration">Duração Máxima por Arquivo (segundos)</label>
-                        <input type="number" id="usb_max_duration" name="usb_receiver.max_audio_duration" min="60"
-                            max="3600" value="300">
-                        <small>Arquivos serão divididos após este tempo</small>
-                    </div>
-
-                    <h3>Processamento Automático</h3>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="usb_auto_transcribe" name="usb_receiver.auto_transcribe" checked>
-                            Transcrever automaticamente com Whisper
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="usb_auto_summarize" name="usb_receiver.auto_summarize" checked>
-                            Gerar resumo automático com LLM
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="usb_min_duration">Duração Mínima para Processar (segundos)</label>
-                        <input type="number" id="usb_min_duration" name="usb_receiver.min_audio_duration" min="1"
-                            max="60" step="0.5" value="3">
-                        <small>Áudios menores serão ignorados</small>
-                    </div>
-
-                    <h3>Divisão por Silêncio</h3>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="usb_silence_split" name="usb_receiver.silence_split" checked>
-                            Dividir gravação quando detectar silêncio
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label for="usb_silence_threshold">Tempo de Silêncio para Dividir (segundos)</label>
-                        <input type="number" id="usb_silence_threshold" name="usb_receiver.silence_threshold" min="0.5"
-                            max="10" step="0.5" value="2">
-                    </div>
-
-                    <h3>Opções Adicionais</h3>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="usb_process_on_disconnect"
-                                name="usb_receiver.process_on_disconnect" checked>
-                            Processar quando USB desconectar
-                        </label>
-                    </div>
-
-                    <div class="form-group">
-                        <label>
-                            <input type="checkbox" id="usb_keep_original" name="usb_receiver.keep_original_audio"
-                                checked>
-                            Manter arquivo de áudio original após processar
-                        </label>
-                    </div>
-                </div>
-
-                <div class="status-card">
-                    <h3>Status do USB Gadget</h3>
-                    <div id="usb-gadget-status">
-                        <p>Estado: <span id="usb-gadget-state">Não configurado</span></p>
-                        <p>Módulo g_audio: <span id="usb-module-status">-</span></p>
-                        <p>Gravações Salvas: <span id="usb-recordings-count">0</span></p>
-                    </div>
-                    <button type="button" id="btn-check-usb-status" class="btn btn-secondary">🔄 Verificar
-                        Status</button>
-                </div>
-            </section>
-
-            <!-- System Tab -->
-            <section id="tab-system" class="tab-content">
-                <h2>Sistema</h2>
-
-                <div class="status-card">
-                    <h3>Informações do Sistema</h3>
-                    <div id="system-info">
-                        <p>Plataforma: <span id="sys-platform">-</span></p>
-                        <p>Hostname: <span id="sys-hostname">-</span></p>
-                        <p>CPU Temp: <span id="sys-temp">-</span></p>
-                        <p>Memória: <span id="sys-memory">-</span></p>
-                        <p>Disco: <span id="sys-disk">-</span></p>
-                    </div>
-                    <button type="button" id="btn-refresh-system" class="btn btn-secondary">🔄 Atualizar</button>
-                </div>
-
-                <div class="form-group">
-                    <label for="log_level">Nível de Log</label>
-                    <select id="log_level" name="system.log_level">
-                        <option value="DEBUG">Debug</option>
-                        <option value="INFO">Info</option>
-                        <option value="WARNING">Warning</option>
-                        <option value="ERROR">Error</option>
-                    </select>
-                </div>
-
-                <div class="form-group">
-                    <label for="timeout">Timeout de Processamento (s)</label>
-                    <input type="number" id="timeout" name="system.timeout" min="30" max="300" value="60">
-                </div>
-
-                <div class="form-group">
-                    <h3>Ações</h3>
-                    <button type="button" id="btn-export" class="btn btn-secondary">📤 Exportar Config</button>
-                    <button type="button" id="btn-import" class="btn btn-secondary">📥 Importar Config</button>
-                    <button type="button" id="btn-reset" class="btn btn-danger">🔄 Resetar Padrões</button>
-                </div>
-            </section>
-
-            <!-- Transcription Tab -->
-            <section id="tab-transcription" class="tab-content">
-                <h2>📝 Transcrição de Voz</h2>
-
-                <!-- Controles de Gravação -->
-                <div class="transcription-controls">
-                    <button type="button" id="btn-record" class="btn btn-record">
-                        <span class="record-icon">🎙️</span>
-                        <span id="record-btn-text">Iniciar Gravação</span>
-                    </button>
-                    <div id="recording-status" class="recording-status hidden">
-                        <span class="pulse-dot"></span>
-                        <span id="recording-status-text">Gravando...</span>
-                    </div>
-                </div>
-
-                <!-- Resultado da Transcrição Atual -->
-                <div id="current-transcription" class="transcription-result hidden">
-                    <h3>Última Transcrição</h3>
-                    <div class="transcription-text-container">
-                        <div class="transcription-meta">
-                            <span id="trans-timestamp"></span>
-                            <span id="trans-duration"></span>
-                            <span id="trans-time"></span>
-                        </div>
-                        <div id="transcription-text" class="transcription-text"></div>
-                    </div>
-                    <div id="transcription-summary" class="transcription-summary hidden">
-                        <h4>📋 Resumo</h4>
-                        <p id="summary-text"></p>
-                    </div>
-                </div>
-
-                <!-- Upload de Áudio -->
-                <div class="upload-section">
-                    <h3>Ou envie um arquivo de áudio</h3>
-                    <div class="upload-area">
-                        <input type="file" id="audio-upload" accept="audio/*,.wav,.mp3,.ogg,.m4a" hidden>
-                        <button type="button" id="btn-upload" class="btn btn-secondary">
-                            📤 Enviar Arquivo de Áudio
-                        </button>
-                        <span id="upload-filename"></span>
-                    </div>
-                </div>
-
-                <!-- Histórico -->
-                <div class="history-section">
-                    <div class="history-header">
-                        <h3>📜 Histórico</h3>
-                        <button type="button" id="btn-clear-history" class="btn btn-secondary btn-small">
-                            🗑️ Limpar
-                        </button>
-                    </div>
-                    <div id="transcription-history" class="transcription-history">
-                        <p class="empty-history">Nenhuma transcrição ainda.</p>
-                    </div>
-                </div>
-
-                <!-- Status do Processador -->
-                <div class="status-card">
-                    <h3>Status do Processador</h3>
-                    <div id="processor-status">
-                        <p>Modo: <span id="proc-mode">-</span></p>
-                        <p>Modelo Whisper: <span id="proc-whisper">-</span></p>
-                        <p>LLM: <span id="proc-llm">-</span></p>
-                        <p>Total Transcrições: <span id="proc-total">0</span></p>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Files Tab -->
-            <section id="tab-files" class="tab-content">
-                <h2>📂 Arquivos de Transcrição</h2>
-
-                <!-- Batch Processor Status -->
-                <div class="status-card">
-                    <h3>🔄 Processador em Lote</h3>
-                    <div id="batch-status">
-                        <p>Estado: <span id="batch-state" class="status-badge">Parado</span></p>
-                        <p>Arquivos pendentes (.wav): <span id="batch-pending">0</span></p>
-                        <p>Processados: <span id="batch-processed">0</span></p>
-                        <p>Falhas: <span id="batch-failed">0</span></p>
-                        <p>Última execução: <span id="batch-last-run">-</span></p>
-                        <p>Próxima execução: <span id="batch-next-run">-</span></p>
-                    </div>
-                    <div class="batch-controls">
-                        <button type="button" id="btn-batch-run" class="btn btn-primary">▶️ Processar Agora</button>
-                        <button type="button" id="btn-batch-start" class="btn btn-secondary">🔄 Iniciar
-                            Automático</button>
-                        <button type="button" id="btn-batch-stop" class="btn btn-secondary" disabled>⏹️ Parar
-                            Automático</button>
-                    </div>
-                </div>
-
-                <!-- Info Box -->
-                <div class="info-box">
-                    <p>💡 <strong>Como funciona:</strong></p>
-                    <p>1. Arquivos <code>.wav</code> são gravados em <code>~/audio-recordings</code></p>
-                    <p>2. O processador transcreve com Whisper e salva como <code>.txt</code></p>
-                    <p>3. Após sucesso, o arquivo <code>.wav</code> é removido para economizar espaço</p>
-                </div>
-
-                <!-- Search -->
-                <div class="files-search">
-                    <input type="text" id="files-search-input" placeholder="🔍 Buscar nas transcrições...">
-                    <button type="button" id="btn-files-search" class="btn btn-secondary">Buscar</button>
-                    <button type="button" id="btn-files-refresh" class="btn btn-secondary">🔄 Atualizar Lista</button>
-                    <button type="button" id="btn-delete-all-txt" class="btn btn-danger"
-                        onclick="deleteAllTranscriptions()">🗑️ Apagar Todos TXT</button>
-                </div>
-
-                <!-- Files List -->
-                <div class="files-list-container">
-                    <h3>📄 Transcrições Salvas</h3>
-                    <div id="files-list" class="files-list">
-                        <p class="empty-message">Carregando...</p>
-                    </div>
-                    <div class="files-footer">
-                        <span id="files-count">0 arquivos</span>
-                    </div>
-                </div>
-
-                <!-- Search Results -->
-                <div id="search-results" class="search-results" style="display: none;">
-                    <h3>🔍 Resultados da Busca</h3>
-                    <div id="search-results-list"></div>
-                    <button type="button" id="btn-clear-search" class="btn btn-secondary">Limpar Busca</button>
-                </div>
-            </section>
-
-            <!-- File View Modal -->
-            <div id="file-view-modal" class="modal" style="display: none;">
-                <div class="modal-content modal-large">
-                    <div class="modal-header">
-                        <h3 id="modal-filename">Arquivo</h3>
-                        <button type="button" class="modal-close" onclick="closeFileModal()">&times;</button>
-                    </div>
-                    <div class="modal-body">
-                        <pre id="modal-file-content" class="file-content"></pre>
-                    </div>
-                    <div class="modal-footer">
-                        <button type="button" class="btn btn-secondary" onclick="closeFileModal()">Fechar</button>
-                        <button type="button" id="btn-modal-delete" class="btn btn-danger">🗑️ Deletar</button>
+                    <p class="model-desc">Mais preciso, mais lento.</p>
+                    <div class="model-actions">
+                        <span class="model-status" id="whisper-small-status">❓</span>
+                        <button class="btn btn-small" onclick="downloadWhisperModel('small')">📥 Baixar</button>
                     </div>
                 </div>
             </div>
 
-            <!-- Logs Tab -->
-            <section id="tab-logs" class="tab-content">
-                <h2>📋 Logs da Aplicação</h2>
-
-                <!-- Stats -->
-                <div class="status-card">
-                    <h3>📊 Estatísticas</h3>
-                    <div class="logs-stats">
-                        <span class="stat-item">
-                            <span class="stat-label">Total:</span>
-                            <span id="logs-total" class="stat-value">0</span>
-                        </span>
-                        <span class="stat-item">
-                            <span class="stat-label">Erros:</span>
-                            <span id="logs-errors" class="stat-value error">0</span>
-                        </span>
-                        <span class="stat-item">
-                            <span class="stat-label">Avisos:</span>
-                            <span id="logs-warnings" class="stat-value warning">0</span>
-                        </span>
-                    </div>
-                </div>
-
-                <!-- Controls -->
-                <div class="logs-controls">
-                    <div class="logs-filters">
-                        <select id="logs-level-filter">
-                            <option value="">Todos os níveis</option>
-                            <option value="DEBUG">DEBUG</option>
-                            <option value="INFO">INFO</option>
-                            <option value="WARNING">WARNING</option>
-                            <option value="ERROR">ERROR</option>
-                            <option value="CRITICAL">CRITICAL</option>
-                        </select>
-                        <input type="number" id="logs-limit" value="100" min="10" max="500" placeholder="Limite">
-                    </div>
-                    <div class="logs-actions">
-                        <button class="btn btn-small" id="btn-refresh-logs">🔄 Atualizar</button>
-                        <button class="btn btn-small" id="btn-errors-only">❌ Só Erros</button>
-                        <button class="btn btn-small btn-danger" id="btn-clear-logs">🗑️ Limpar</button>
-                    </div>
-                </div>
-
-                <!-- Info Box -->
-                <div class="info-box">
-                    <p>💡 Os logs são armazenados em memória (últimos 500 registros). Use os filtros para encontrar
-                        erros ou informações específicas.</p>
-                </div>
-
-                <!-- Logs List -->
-                <div class="logs-container">
-                    <div id="logs-list" class="logs-list">
-                        <p class="empty-message">Carregando logs...</p>
-                    </div>
-                </div>
-
-                <!-- Auto-refresh toggle -->
-                <div class="logs-footer">
-                    <label class="toggle-label">
-                        <input type="checkbox" id="logs-auto-refresh">
-                        Auto-atualizar (5s)
+            <div class="form-group" style="margin-top: 20px; border-top: 1px dashed #444; padding-top: 15px;">
+                <h3>Teste de Pipeline (Ao Vivo)</h3>
+                <p class="force-small">Grava 5s do microfone e transcreve com o modelo selecionado.</p>
+                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
+                    <label style="font-weight: normal; font-size: 0.9em; cursor: pointer;">
+                        <input type="checkbox" id="test-include-llm"> Incluir Resumo (LLM)
                     </label>
-                    <span id="logs-last-update">-</span>
                 </div>
-            </section>
+                <button type="button" class="btn btn-warning" onclick="testLivePipeline()" id="btn-test-live">
+                    🎙️ Gravar e Testar (5s)
+                </button>
+                <div id="live-test-result"
+                    style="margin-top: 10px; font-family: monospace; font-size: 0.9em; display: none; padding: 10px; background: #222; border-radius: 4px;">
+                </div>
+            </div>
+        </div>
 
-        </main>
+        <!-- LLM Models -->
+        <div class="config-section">
+            <h3>🤖 Modelos LLM (Resumo/Chat)</h3>
+            <p class="section-description">Modelos de linguagem para gerar resumos. Precisam de mais RAM/swap.
+            </p>
 
-        <!-- Footer Actions -->
-        <footer class="footer">
-            <button type="button" id="btn-save" class="btn btn-primary">💾 Salvar Configurações</button>
-            <button type="button" id="btn-save-restart" class="btn btn-warning">💾🔄 Salvar e Reiniciar</button>
-            <button type="button" id="btn-reload" class="btn btn-secondary">↩️ Recarregar</button>
-            <span id="save-status"></span>
-        </footer>
+            <div id="llm-models" class="models-grid">
+                <div class="model-card" data-model="tinyllama">
+                    <div class="model-header">
+                        <span class="model-name">TinyLlama 1.1B</span>
+                        <span class="model-size">~670 MB</span>
+                    </div>
+                    <p class="model-desc">Modelo pequeno, funciona no Pi Zero com swap.</p>
+                    <div class="model-actions">
+                        <span class="model-status" id="llm-tinyllama-status">❓</span>
+                        <button class="btn btn-small" onclick="downloadLLMModel('tinyllama')">📥 Baixar</button>
+                    </div>
+                </div>
+
+                <div class="model-card" data-model="phi2">
+                    <div class="model-header">
+                        <span class="model-name">Phi-2 2.7B</span>
+                        <span class="model-size">~1.6 GB</span>
+                    </div>
+                    <p class="model-desc">Mais capaz, requer mais recursos.</p>
+                    <div class="model-actions">
+                        <span class="model-status" id="llm-phi2-status">❓</span>
+                        <button class="btn btn-small" onclick="downloadLLMModel('phi2')">📥 Baixar</button>
+                    </div>
+                </div>
+
+                <div class="model-card" data-model="gemma2b">
+                    <div class="model-header">
+                        <span class="model-name">Gemma 2B</span>
+                        <span class="model-size">~1.5 GB</span>
+                    </div>
+                    <p class="model-desc">Google Gemma, boa qualidade.</p>
+                    <div class="model-actions">
+                        <span class="model-status" id="llm-gemma2b-status">❓</span>
+                        <button class="btn btn-small" onclick="downloadLLMModel('gemma2b')">📥 Baixar</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Download Progress -->
+        <div id="download-progress" class="status-card" style="display: none;">
+            <h3>⏳ Download em Progresso</h3>
+            <div class="progress-bar">
+                <div class="progress-fill" id="download-progress-fill" style="width: 0%"></div>
+            </div>
+            <p id="download-progress-text">Iniciando...</p>
+        </div>
+
+        <!-- Refresh Button -->
+        <div style="margin-top: 16px;">
+            <button class="btn btn-secondary" onclick="refreshModelStatus()">🔄 Atualizar Status</button>
+        </div>
+    </section>
+
+    <!-- Offline Queue Tab -->
+    <section id="tab-offline" class="tab-content">
+        <h2>Fila Offline</h2>
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="offline_enabled" name="offline_queue.enabled" checked>
+                Habilitar Fila Offline
+            </label>
+            <small>Armazena tarefas quando sem internet</small>
+        </div>
+
+        <div class="form-group">
+            <label for="max_queue_size">Tamanho Máximo da Fila</label>
+            <input type="number" id="max_queue_size" name="offline_queue.max_queue_size" min="100" max="10000"
+                value="1000">
+        </div>
+
+        <div class="form-group">
+            <label for="retry_delay">Delay Base para Retry (s)</label>
+            <input type="number" id="retry_delay" name="offline_queue.retry_delay_base" min="10" max="300" value="30">
+        </div>
+
+        <div class="form-group">
+            <label for="max_retries">Máximo de Retries</label>
+            <input type="number" id="max_retries" name="offline_queue.max_retries" min="1" max="10" value="3">
+        </div>
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="use_local_fallback" name="offline_queue.use_local_fallback" checked>
+                Usar LLM Local como Fallback
+            </label>
+        </div>
+
+        <div class="status-card">
+            <h3>Status da Fila</h3>
+            <div id="queue-stats">
+                <p>Pendentes: <span id="queue-pending">-</span></p>
+                <p>Processando: <span id="queue-processing">-</span></p>
+                <p>Concluídos: <span id="queue-completed">-</span></p>
+                <p>Conectividade: <span id="queue-online">-</span></p>
+            </div>
+            <button type="button" id="btn-refresh-queue" class="btn btn-secondary">🔄 Atualizar</button>
+        </div>
+    </section>
+
+    <!-- Power Management Tab -->
+    <section id="tab-power" class="tab-content">
+        <h2>Gerenciamento de Energia</h2>
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="power_enabled" name="power_management.enabled">
+                <strong>Habilitar Gerenciamento de Energia</strong>
+            </label>
+            <small>Feature toggle - controla consumo de energia</small>
+        </div>
+
+        <div class="form-group">
+            <label for="power_mode">Modo Padrão</label>
+            <select id="power_mode" name="power_management.default_mode">
+                <option value="performance">Performance (~1800mW)</option>
+                <option value="balanced">Equilibrado (~1200mW)</option>
+                <option value="power_save">Economia (~800mW)</option>
+                <option value="ultra_power_save">Ultra Economia (~500mW)</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label>
+                <input type="checkbox" id="power_auto_adjust" name="power_management.auto_adjust" checked>
+                Ajuste Automático
+            </label>
+            <small>Ajusta baseado em atividade e temperatura</small>
+        </div>
+
+        <div class="form-group">
+            <label for="idle_timeout">Timeout para Idle (s)</label>
+            <input type="number" id="idle_timeout" name="power_management.idle_timeout" min="30" max="600" value="60">
+        </div>
+
+        <div class="form-group">
+            <label for="temp_high">Temperatura Alta (°C)</label>
+            <input type="number" id="temp_high" name="power_management.thermal.threshold_high" min="50" max="80"
+                value="70">
+        </div>
+
+        <div class="form-group">
+            <label for="temp_critical">Temperatura Crítica (°C)</label>
+            <input type="number" id="temp_critical" name="power_management.thermal.threshold_critical" min="60" max="90"
+                value="80">
+        </div>
+
+        <div class="status-card">
+            <h3>Status de Energia</h3>
+            <div id="power-stats">
+                <p>Modo Atual: <span id="power-current-mode">-</span></p>
+                <p>Temperatura: <span id="power-temp">-</span></p>
+                <p>Idle: <span id="power-idle">-</span></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- USB Receiver Tab -->
+    <section id="tab-usb-receiver" class="tab-content">
+        <h2>🎧 Escuta Contínua & Transcrição</h2>
+
+        <div class="info-box">
+            <p>💡 <strong>O Raspberry Pi pode escutar e transcrever áudio automaticamente de duas
+                    formas:</strong></p>
+            <p>1. <strong>ReSpeaker HAT</strong> - Usa o microfone local para capturar áudio</p>
+            <p>2. <strong>USB Gadget</strong> - Recebe áudio de um PC conectado via USB</p>
+        </div>
+
+        <!-- Modo 1: ReSpeaker (Microfone Local) -->
+        <div class="config-section">
+            <h3>🎙️ Modo 1: ReSpeaker HAT (Microfone Local)</h3>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="usb_receiver_enabled" name="usb_receiver.enabled" checked>
+                    <strong>Habilitar Escuta via ReSpeaker</strong>
+                </label>
+                <small>Usa o microfone do ReSpeaker HAT para capturar áudio ambiente</small>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="usb_continuous_listen" name="usb_receiver.continuous_listen" checked>
+                    <strong>Escuta Contínua Automática</strong>
+                </label>
+                <small>Quando habilitado, escuta e transcreve 24/7 automaticamente</small>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="usb_auto_start" name="usb_receiver.auto_start">
+                    <strong>🚀 Auto-Iniciar ao Abrir</strong>
+                </label>
+                <small>Inicia a escuta automaticamente quando a aplicação é aberta</small>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="usb_auto_process" name="usb_receiver.auto_process">
+                    <strong>🔄 Auto-Processar Arquivos</strong>
+                </label>
+                <small>Inicia o processamento em lote automaticamente (transcreve .wav → .txt, remove
+                    .wav)</small>
+            </div>
+        </div>
+
+        <!-- Modo 2: USB Gadget -->
+        <div class="config-section">
+            <h3>🔌 Modo 2: USB Gadget (Áudio via USB)</h3>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="usb_gadget_enabled" name="usb_receiver.usb_gadget_enabled">
+                    <strong>Habilitar USB Gadget</strong>
+                </label>
+                <small>⚠️ Transforma o Pi em placa de som USB. Requer:
+                    <code>sudo ./scripts/setup_usb_gadget.sh</code></small>
+            </div>
+        </div>
+
+        <!-- Controles de Escuta -->
+        <div class="status-card">
+            <h3>🎛️ Controles de Escuta</h3>
+
+            <div class="listener-controls">
+                <button type="button" id="btn-listener-start" class="btn btn-primary">
+                    ▶️ Iniciar Escuta
+                </button>
+                <button type="button" id="btn-listener-pause" class="btn btn-secondary" disabled>
+                    ⏸️ Pausar
+                </button>
+                <button type="button" id="btn-listener-stop" class="btn btn-danger" disabled>
+                    ⏹️ Parar
+                </button>
+            </div>
+
+            <div id="listener-status" class="listener-status">
+                <p>Estado: <span id="listener-state" class="status-badge">Parado</span></p>
+                <p>Segmentos transcritos: <span id="listener-segments-count">0</span></p>
+            </div>
+        </div>
+        <!-- Transcrições em Tempo Real -->
+        <div class="status-card transcriptions-panel">
+            <div class="panel-header">
+                <h3>📝 Transcrições em Tempo Real</h3>
+                <div class="panel-actions">
+                    <button type="button" id="btn-export-json" class="btn btn-small" title="Exportar JSON">
+                        📥 JSON
+                    </button>
+                    <button type="button" id="btn-export-txt" class="btn btn-small" title="Exportar TXT">
+                        📄 TXT
+                    </button>
+                    <button type="button" id="btn-clear-segments" class="btn btn-small btn-danger" title="Limpar">
+                        🗑️
+                    </button>
+                </div>
+            </div>
+
+            <!-- Filtros e Busca -->
+            <div class="transcription-filters">
+                <div class="search-box">
+                    <input type="text" id="transcription-search" placeholder="🔍 Buscar nas transcrições...">
+                </div>
+                <div class="filter-options">
+                    <label class="filter-item">
+                        <input type="checkbox" id="filter-with-summary" checked>
+                        Com resumo
+                    </label>
+                    <select id="filter-duration">
+                        <option value="">Todas durações</option>
+                        <option value="short">Curtas (&lt; 10s)</option>
+                        <option value="medium">Médias (10-60s)</option>
+                        <option value="long">Longas (&gt; 60s)</option>
+                    </select>
+                </div>
+            </div>
+
+            <!-- Lista de Transcrições -->
+            <div id="live-transcriptions" class="live-transcriptions">
+                <p class="empty-message">Nenhuma transcrição ainda. Inicie a escuta para ver as transcrições
+                    em
+                    tempo real.</p>
+            </div>
+
+            <!-- Controles Inferiores -->
+            <div class="transcription-footer">
+                <span id="transcription-count">0 transcrições</span>
+                <button type="button" id="btn-refresh-transcriptions" class="btn btn-secondary">
+                    🔄 Atualizar
+                </button>
+                <button type="button" id="btn-load-more" class="btn btn-secondary" disabled>
+                    📜 Carregar mais
+                </button>
+            </div>
+        </div>
+
+        <div id="usb-receiver-config" class="config-section">
+            <h3>Configurações de Gravação</h3>
+
+            <div class="form-group">
+                <label for="usb_save_directory">Diretório de Gravações</label>
+                <input type="text" id="usb_save_directory" name="usb_receiver.save_directory"
+                    value="~/audio-recordings">
+                <small>Onde os arquivos de áudio serão salvos</small>
+            </div>
+
+            <div class="form-group">
+                <label for="usb_sample_rate">Taxa de Amostragem</label>
+                <select id="usb_sample_rate" name="usb_receiver.sample_rate">
+                    <option value="44100">44100 Hz (CD Quality)</option>
+                    <option value="48000">48000 Hz (DVD Quality)</option>
+                    <option value="16000">16000 Hz (Otimizado Whisper)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="usb_channels">Canais</label>
+                <select id="usb_channels" name="usb_receiver.channels">
+                    <option value="2">Stereo (2 canais)</option>
+                    <option value="1">Mono (1 canal)</option>
+                </select>
+            </div>
+
+            <div class="form-group">
+                <label for="usb_max_duration">Duração Máxima por Arquivo (segundos)</label>
+                <input type="number" id="usb_max_duration" name="usb_receiver.max_audio_duration" min="60" max="3600"
+                    value="300">
+                <small>Arquivos serão divididos após este tempo</small>
+            </div>
+
+            <h3>Processamento Automático</h3>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="usb_auto_transcribe" name="usb_receiver.auto_transcribe" checked>
+                    Transcrever automaticamente com Whisper
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="usb_auto_summarize" name="usb_receiver.auto_summarize" checked>
+                    Gerar resumo automático com LLM
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label for="usb_min_duration">Duração Mínima para Processar (segundos)</label>
+                <input type="number" id="usb_min_duration" name="usb_receiver.min_audio_duration" min="1" max="60"
+                    step="0.5" value="3">
+                <small>Áudios menores serão ignorados</small>
+            </div>
+
+            <h3>Divisão por Silêncio</h3>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="usb_silence_split" name="usb_receiver.silence_split" checked>
+                    Dividir gravação quando detectar silêncio
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label for="usb_silence_threshold">Tempo de Silêncio para Dividir (segundos)</label>
+                <input type="number" id="usb_silence_threshold" name="usb_receiver.silence_threshold" min="0.5" max="10"
+                    step="0.5" value="2">
+            </div>
+
+            <h3>Opções Adicionais</h3>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="usb_process_on_disconnect" name="usb_receiver.process_on_disconnect"
+                        checked>
+                    Processar quando USB desconectar
+                </label>
+            </div>
+
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="usb_keep_original" name="usb_receiver.keep_original_audio" checked>
+                    Manter arquivo de áudio original após processar
+                </label>
+            </div>
+        </div>
+
+        <div class="status-card">
+            <h3>Status do USB Gadget</h3>
+            <div id="usb-gadget-status">
+                <p>Estado: <span id="usb-gadget-state">Não configurado</span></p>
+                <p>Módulo g_audio: <span id="usb-module-status">-</span></p>
+                <p>Gravações Salvas: <span id="usb-recordings-count">0</span></p>
+            </div>
+            <button type="button" id="btn-check-usb-status" class="btn btn-secondary">🔄 Verificar
+                Status</button>
+        </div>
+    </section>
+
+    <!-- System Tab -->
+    <section id="tab-system" class="tab-content">
+        <h2>Sistema</h2>
+
+        <div class="status-card">
+            <h3>Informações do Sistema</h3>
+            <div id="system-info">
+                <p>Plataforma: <span id="sys-platform">-</span></p>
+                <p>Hostname: <span id="sys-hostname">-</span></p>
+                <p>CPU Temp: <span id="sys-temp">-</span></p>
+                <p>Memória: <span id="sys-memory">-</span></p>
+                <p>Disco: <span id="sys-disk">-</span></p>
+            </div>
+            <button type="button" id="btn-refresh-system" class="btn btn-secondary">🔄 Atualizar</button>
+        </div>
+
+        <div class="form-group">
+            <label for="log_level">Nível de Log</label>
+            <select id="log_level" name="system.log_level">
+                <option value="DEBUG">Debug</option>
+                <option value="INFO">Info</option>
+                <option value="WARNING">Warning</option>
+                <option value="ERROR">Error</option>
+            </select>
+        </div>
+
+        <div class="form-group">
+            <label for="timeout">Timeout de Processamento (s)</label>
+            <input type="number" id="timeout" name="system.timeout" min="30" max="300" value="60">
+        </div>
+
+        <div class="form-group">
+            <h3>Ações</h3>
+            <button type="button" id="btn-export" class="btn btn-secondary">📤 Exportar Config</button>
+            <button type="button" id="btn-import" class="btn btn-secondary">📥 Importar Config</button>
+            <button type="button" id="btn-reset" class="btn btn-danger">🔄 Resetar Padrões</button>
+        </div>
+    </section>
+
+    <!-- Transcription Tab -->
+    <section id="tab-transcription" class="tab-content">
+        <h2>📝 Transcrição de Voz</h2>
+
+        <!-- Controles de Gravação -->
+        <div class="transcription-controls">
+            <button type="button" id="btn-record" class="btn btn-record">
+                <span class="record-icon">🎙️</span>
+                <span id="record-btn-text">Iniciar Gravação</span>
+            </button>
+            <div id="recording-status" class="recording-status hidden">
+                <span class="pulse-dot"></span>
+                <span id="recording-status-text">Gravando...</span>
+            </div>
+        </div>
+
+        <!-- Resultado da Transcrição Atual -->
+        <div id="current-transcription" class="transcription-result hidden">
+            <h3>Última Transcrição</h3>
+            <div class="transcription-text-container">
+                <div class="transcription-meta">
+                    <span id="trans-timestamp"></span>
+                    <span id="trans-duration"></span>
+                    <span id="trans-time"></span>
+                </div>
+                <div id="transcription-text" class="transcription-text"></div>
+            </div>
+            <div id="transcription-summary" class="transcription-summary hidden">
+                <h4>📋 Resumo</h4>
+                <p id="summary-text"></p>
+            </div>
+        </div>
+
+        <!-- Upload de Áudio -->
+        <div class="upload-section">
+            <h3>Ou envie um arquivo de áudio</h3>
+            <div class="upload-area">
+                <input type="file" id="audio-upload" accept="audio/*,.wav,.mp3,.ogg,.m4a" hidden>
+                <button type="button" id="btn-upload" class="btn btn-secondary">
+                    📤 Enviar Arquivo de Áudio
+                </button>
+                <span id="upload-filename"></span>
+            </div>
+        </div>
+
+        <!-- Histórico -->
+        <div class="history-section">
+            <div class="history-header">
+                <h3>📜 Histórico</h3>
+                <button type="button" id="btn-clear-history" class="btn btn-secondary btn-small">
+                    🗑️ Limpar
+                </button>
+            </div>
+            <div id="transcription-history" class="transcription-history">
+                <p class="empty-history">Nenhuma transcrição ainda.</p>
+            </div>
+        </div>
+
+        <!-- Status do Processador -->
+        <div class="status-card">
+            <h3>Status do Processador</h3>
+            <div id="processor-status">
+                <p>Modo: <span id="proc-mode">-</span></p>
+                <p>Modelo Whisper: <span id="proc-whisper">-</span></p>
+                <p>LLM: <span id="proc-llm">-</span></p>
+                <p>Total Transcrições: <span id="proc-total">0</span></p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Files Tab -->
+    <section id="tab-files" class="tab-content">
+        <h2>📂 Arquivos de Transcrição</h2>
+
+        <!-- Batch Processor Status -->
+        <div class="status-card">
+            <h3>🔄 Processador em Lote</h3>
+            <div id="batch-status">
+                <p>Estado: <span id="batch-state" class="status-badge">Parado</span></p>
+                <p>Arquivos pendentes (.wav): <span id="batch-pending">0</span></p>
+                <p>Processados: <span id="batch-processed">0</span></p>
+                <p>Falhas: <span id="batch-failed">0</span></p>
+                <p>Última execução: <span id="batch-last-run">-</span></p>
+                <p>Próxima execução: <span id="batch-next-run">-</span></p>
+            </div>
+            <div class="batch-controls">
+                <button type="button" id="btn-batch-run" class="btn btn-primary">▶️ Processar Agora</button>
+                <button type="button" id="btn-batch-start" class="btn btn-secondary">🔄 Iniciar
+                    Automático</button>
+                <button type="button" id="btn-batch-stop" class="btn btn-secondary" disabled>⏹️ Parar
+                    Automático</button>
+            </div>
+        </div>
+
+        <!-- Info Box -->
+        <div class="info-box">
+            <p>💡 <strong>Como funciona:</strong></p>
+            <p>1. Arquivos <code>.wav</code> são gravados em <code>~/audio-recordings</code></p>
+            <p>2. O processador transcreve com Whisper e salva como <code>.txt</code></p>
+            <p>3. Após sucesso, o arquivo <code>.wav</code> é removido para economizar espaço</p>
+        </div>
+
+        <!-- Search -->
+        <div class="files-search">
+            <input type="text" id="files-search-input" placeholder="🔍 Buscar nas transcrições...">
+            <button type="button" id="btn-files-search" class="btn btn-secondary">Buscar</button>
+            <button type="button" id="btn-files-refresh" class="btn btn-secondary">🔄 Atualizar Lista</button>
+            <button type="button" id="btn-delete-all-txt" class="btn btn-danger" onclick="deleteAllTranscriptions()">🗑️
+                Apagar Todos TXT</button>
+        </div>
+
+        <!-- Files List -->
+        <div class="files-list-container">
+            <h3>📄 Transcrições Salvas</h3>
+            <div id="files-list" class="files-list">
+                <p class="empty-message">Carregando...</p>
+            </div>
+            <div class="files-footer">
+                <span id="files-count">0 arquivos</span>
+            </div>
+        </div>
+
+        <!-- Search Results -->
+        <div id="search-results" class="search-results" style="display: none;">
+            <h3>🔍 Resultados da Busca</h3>
+            <div id="search-results-list"></div>
+            <button type="button" id="btn-clear-search" class="btn btn-secondary">Limpar Busca</button>
+        </div>
+    </section>
+
+    <!-- File View Modal -->
+    <div id="file-view-modal" class="modal" style="display: none;">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h3 id="modal-filename">Arquivo</h3>
+                <button type="button" class="modal-close" onclick="closeFileModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <pre id="modal-file-content" class="file-content"></pre>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeFileModal()">Fechar</button>
+                <button type="button" id="btn-modal-delete" class="btn btn-danger">🗑️ Deletar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logs Tab -->
+    <section id="tab-logs" class="tab-content">
+        <h2>📋 Logs da Aplicação</h2>
+
+        <!-- Stats -->
+        <div class="status-card">
+            <h3>📊 Estatísticas</h3>
+            <div class="logs-stats">
+                <span class="stat-item">
+                    <span class="stat-label">Total:</span>
+                    <span id="logs-total" class="stat-value">0</span>
+                </span>
+                <span class="stat-item">
+                    <span class="stat-label">Erros:</span>
+                    <span id="logs-errors" class="stat-value error">0</span>
+                </span>
+                <span class="stat-item">
+                    <span class="stat-label">Avisos:</span>
+                    <span id="logs-warnings" class="stat-value warning">0</span>
+                </span>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <div class="logs-controls">
+            <div class="logs-filters">
+                <select id="logs-level-filter">
+                    <option value="">Todos os níveis</option>
+                    <option value="DEBUG">DEBUG</option>
+                    <option value="INFO">INFO</option>
+                    <option value="WARNING">WARNING</option>
+                    <option value="ERROR">ERROR</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                </select>
+                <input type="number" id="logs-limit" value="100" min="10" max="500" placeholder="Limite">
+            </div>
+            <div class="logs-actions">
+                <button class="btn btn-small" id="btn-refresh-logs">🔄 Atualizar</button>
+                <button class="btn btn-small" id="btn-errors-only">❌ Só Erros</button>
+                <button class="btn btn-small btn-danger" id="btn-clear-logs">🗑️ Limpar</button>
+            </div>
+        </div>
+
+        <!-- Info Box -->
+        <div class="info-box">
+            <p>💡 Os logs são armazenados em memória (últimos 500 registros). Use os filtros para encontrar
+                erros ou informações específicas.</p>
+        </div>
+
+        <!-- Logs List -->
+        <div class="logs-container">
+            <div id="logs-list" class="logs-list">
+                <p class="empty-message">Carregando logs...</p>
+            </div>
+        </div>
+
+        <!-- Auto-refresh toggle -->
+        <div class="logs-footer">
+            <label class="toggle-label">
+                <input type="checkbox" id="logs-auto-refresh">
+                Auto-atualizar (5s)
+            </label>
+            <span id="logs-last-update">-</span>
+        </div>
+    </section>
+
+    </main>
+
+    <!-- Footer Actions -->
+    <footer class="footer">
+        <button type="button" id="btn-save" class="btn btn-primary">💾 Salvar Configurações</button>
+        <button type="button" id="btn-save-restart" class="btn btn-warning">💾🔄 Salvar e Reiniciar</button>
+        <button type="button" id="btn-reload" class="btn btn-secondary">↩️ Recarregar</button>
+        <span id="save-status"></span>
+    </footer>
     </div>
 
     <script src="/static/js/app.js"></script>

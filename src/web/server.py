@@ -892,6 +892,7 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
     @app.route("/api/audio/test/mic", methods=["POST"])
     def test_microphone():
         """Teste de microfone: grava 3s e retorna áudio."""
+        was_active = False
         try:
             import tempfile
             import os
@@ -909,13 +910,20 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
                 chunk_size=audio_conf.get('chunk_size', 4096)
             )
             
+            # Pausar listener se ativo
+            if hasattr(app, 'listener') and app.listener and app.listener.active:
+                logger.info("⏸️ Pausando escuta contínua para teste de microfone...")
+                was_active = True
+                app.listener.active = False
+                time.sleep(1.0)
+            
             # Gravar 3 segundos
             logger.info("Iniciando gravação de teste (3s)...")
             
             if app.led_controller:
                 app.led_controller.listening()
             
-            # Forçar 3s mesmo se houver silêncio, para garantir audio audível
+            # Forçar 3s mesmo se houver silêncio
             buffer = capture.record(duration=3.0, stop_on_silence=False)
             
             if app.led_controller:
@@ -929,41 +937,52 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             logger.info(f"Gravação de teste salva em {filename}")
             
             return send_file(filename, mimetype="audio/wav", as_attachment=False)
+            
         except Exception as e:
             logger.error(f"Erro no teste de mic: {e}")
+            if app.led_controller:
+                app.led_controller.error()
             return jsonify({"error": str(e)}), 500
+        finally:
+            if was_active and hasattr(app, 'listener') and app.listener:
+                logger.info("▶️ Retomando escuta contínua...")
+                time.sleep(0.5)
+                app.listener.active = True
 
     @app.route("/api/test/live", methods=["POST"])
     def test_live_pipeline():
-        """Teste de pipeline completo (Gravar -> Transcrever -> LLM)."""
+        """Teste de pipeline completo (Gravar -> Transcrever -> [LLM])."""
+        was_active = False
         try:
-            duration = 5.0 # Fixo em 5s para teste
+            data = request.get_json() or {}
+            duration = float(data.get('duration', 5.0))
+            use_llm = data.get('generate_summary', True) 
             
-            # Importar VoiceProcessor aqui para garantir config fresca
+            if hasattr(app, 'listener') and app.listener and app.listener.active:
+                logger.info("⏸️ Pausando escuta contínua para teste live...")
+                was_active = True
+                app.listener.active = False
+                time.sleep(1.0)
+            
             from src.pipeline import VoiceProcessor
-            
-            # Carregar config do disco
             config_path = app.config["CONFIG_PATH"]
             
             logger.info(f"Iniciando teste live com config: {config_path}")
             
             with VoiceProcessor(config_path=config_path) as processor:
                 logger.info("Gravando...")
-                
                 if app.led_controller:
                     app.led_controller.listening()
                 
-                # Gravar manualmente para controlar duração
                 audio_buffer = processor.audio.record(duration=duration, stop_on_silence=False)
                 
                 logger.info("Processando...")
-                
                 if app.led_controller:
                     app.led_controller.processing()
                 
                 result = processor.process(
                     audio=audio_buffer, 
-                    generate_summary=True
+                    generate_summary=use_llm
                 )
                 
                 if app.led_controller:
@@ -972,13 +991,20 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
                 return jsonify({
                     "success": True,
                     "text": result.text,
-                    "summary": result.summary,
+                    "summary": result.summary if use_llm else "(Ignorado)",
                     "stats": result.to_dict()
                 })
 
         except Exception as e:
             logger.error(f"Erro no teste live: {e}")
+            if app.led_controller:
+                app.led_controller.error()
             return jsonify({"error": str(e)}), 500
+        finally:
+             if was_active and hasattr(app, 'listener') and app.listener:
+                logger.info("▶️ Retomando escuta contínua...")
+                time.sleep(0.5)
+                app.listener.active = True
 
     @app.route("/api/llm/models", methods=["GET"])
     def list_llm_models():
