@@ -30,6 +30,7 @@
             <button class="tab-btn" data-tab="power">Energia</button>
             <button class="tab-btn" data-tab="usb-receiver">🎧 Escuta Contínua</button>
             <button class="tab-btn" data-tab="files">📂 Arquivos</button>
+            <button class="tab-btn" data-tab="history">📚 Histórico</button>
             <button class="tab-btn" data-tab="logs">📋 Logs</button>
             <button class="tab-btn" data-tab="system">Sistema</button>
             <button class="tab-btn" data-tab="transcription">📝 Transcrição</button>
@@ -1118,6 +1119,101 @@
             <div class="modal-footer">
                 <button type="button" class="btn btn-secondary" onclick="closeFileModal()">Fechar</button>
                 <button type="button" id="btn-modal-delete" class="btn btn-danger">🗑️ Deletar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- History Tab -->
+    <section id="tab-history" class="tab-content">
+        <h2>📚 Histórico de Transcrições</h2>
+
+        <div class="info-box">
+            <p>💡 Todas as transcrições são salvas automaticamente e podem ser consultadas, buscadas e processadas com
+                LLM.</p>
+        </div>
+
+        <!-- Filtros e Controles -->
+        <div class="status-card">
+            <h3>🔍 Filtros</h3>
+            <div class="history-filters">
+                <div class="form-group">
+                    <label for="history-date">Data:</label>
+                    <input type="date" id="history-date" class="form-control">
+                </div>
+                <div class="form-group">
+                    <label for="history-search">Buscar:</label>
+                    <input type="text" id="history-search" placeholder="🔍 Buscar por texto...">
+                </div>
+                <div class="button-group">
+                    <button type="button" id="btn-history-load" class="btn btn-primary">📅 Carregar</button>
+                    <button type="button" id="btn-history-search" class="btn btn-secondary">🔍 Buscar</button>
+                    <button type="button" id="btn-history-today" class="btn btn-secondary">Hoje</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Estatísticas do Dia -->
+        <div class="status-card">
+            <h3>📊 Resumo</h3>
+            <div class="history-stats">
+                <div class="stat-item">
+                    <span class="stat-value" id="history-total">0</span>
+                    <span class="stat-label">Transcrições</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="history-duration">0m</span>
+                    <span class="stat-label">Tempo total</span>
+                </div>
+                <div class="stat-item">
+                    <span class="stat-value" id="history-words">0</span>
+                    <span class="stat-label">Palavras</span>
+                </div>
+            </div>
+            <div class="button-group" style="margin-top: 10px;">
+                <button type="button" id="btn-export-day-json" class="btn btn-small">📥 Exportar JSON</button>
+                <button type="button" id="btn-export-day-txt" class="btn btn-small">📄 Exportar TXT</button>
+                <button type="button" id="btn-consolidate" class="btn btn-small">📦 Consolidar</button>
+            </div>
+        </div>
+
+        <!-- Timeline de Transcrições -->
+        <div class="status-card transcriptions-panel">
+            <h3>📝 Timeline</h3>
+            <div id="history-timeline" class="history-timeline">
+                <p class="empty-message">Selecione uma data para carregar o histórico.</p>
+            </div>
+            <div class="transcription-footer">
+                <span id="history-count">0 transcrições</span>
+                <button type="button" id="btn-history-more" class="btn btn-secondary" disabled>📜 Carregar mais</button>
+            </div>
+        </div>
+    </section>
+
+    <!-- LLM Processing Modal -->
+    <div id="llm-modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>🤖 Processar com LLM</h3>
+                <button type="button" class="modal-close" onclick="closeLLMModal()">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="llm-prompt">Prompt:</label>
+                    <textarea id="llm-prompt" rows="3"
+                        placeholder="Resuma o seguinte texto de forma concisa:">Resuma o seguinte texto de forma concisa:</textarea>
+                </div>
+                <div class="form-group">
+                    <label>Texto da Transcrição:</label>
+                    <pre id="llm-input-text" class="llm-preview"></pre>
+                </div>
+                <div id="llm-result-container" style="display: none;">
+                    <label>Resultado:</label>
+                    <div id="llm-result" class="llm-result"></div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" onclick="closeLLMModal()">Cancelar</button>
+                <button type="button" id="btn-process-llm" class="btn btn-primary">🚀 Processar</button>
             </div>
         </div>
     </div>

@@ -2284,6 +2284,281 @@ async function testLivePipeline() {
 }
 
 // ==========================================================================
+// History Tab
+// ==========================================================================
+
+let historyTranscriptions = [];
+let currentLLMTranscriptionId = null;
+
+async function loadHistoryByDate(dateStr) {
+    const timeline = $('#history-timeline');
+    if (!timeline) return;
+
+    timeline.innerHTML = '<p class="loading">Carregando...</p>';
+
+    try {
+        const result = await apiGet(`transcriptions/daily/${dateStr}`);
+
+        if (result.success) {
+            historyTranscriptions = result.transcriptions || [];
+            updateHistoryStats(result);
+            renderHistoryTimeline(historyTranscriptions);
+        } else {
+            timeline.innerHTML = `<p class="error-message">${result.error}</p>`;
+        }
+    } catch (error) {
+        console.error('Erro ao carregar histórico:', error);
+        timeline.innerHTML = '<p class="error-message">Erro ao carregar histórico.</p>';
+    }
+}
+
+async function searchHistory(query) {
+    const timeline = $('#history-timeline');
+    if (!timeline) return;
+
+    timeline.innerHTML = '<p class="loading">Buscando...</p>';
+
+    try {
+        const result = await apiPost('transcriptions/search', { query, limit: 100 });
+
+        if (result.success) {
+            historyTranscriptions = result.results || [];
+            renderHistoryTimeline(historyTranscriptions);
+            $('#history-total').textContent = result.total;
+            $('#history-count').textContent = `${result.total} resultados para "${query}"`;
+        } else {
+            timeline.innerHTML = `<p class="error-message">${result.error}</p>`;
+        }
+    } catch (error) {
+        console.error('Erro na busca:', error);
+        timeline.innerHTML = '<p class="error-message">Erro na busca.</p>';
+    }
+}
+
+function updateHistoryStats(data) {
+    const total = data.total_transcriptions || data.transcriptions?.length || 0;
+    const durationSec = data.total_duration_seconds ||
+        (data.transcriptions || []).reduce((sum, t) => sum + (t.duration_seconds || 0), 0);
+    const words = (data.transcriptions || [])
+        .reduce((sum, t) => sum + (t.text || '').split(/\s+/).length, 0);
+
+    $('#history-total').textContent = total;
+    $('#history-duration').textContent = formatDuration(durationSec);
+    $('#history-words').textContent = words;
+}
+
+function formatDuration(seconds) {
+    if (seconds < 60) return `${Math.round(seconds)}s`;
+    const minutes = Math.floor(seconds / 60);
+    if (minutes < 60) return `${minutes}m`;
+    const hours = Math.floor(minutes / 60);
+    return `${hours}h ${minutes % 60}m`;
+}
+
+function renderHistoryTimeline(transcriptions) {
+    const timeline = $('#history-timeline');
+    if (!timeline) return;
+
+    if (!transcriptions || transcriptions.length === 0) {
+        timeline.innerHTML = '<p class="empty-message">Nenhuma transcrição encontrada.</p>';
+        $('#history-count').textContent = '0 transcrições';
+        return;
+    }
+
+    timeline.innerHTML = transcriptions.map(t => {
+        const time = t.timestamp ? new Date(t.timestamp).toLocaleTimeString('pt-BR') : '--:--:--';
+        const duration = t.duration_seconds ? `${t.duration_seconds.toFixed(1)}s` : '';
+        const preview = (t.text || '').substring(0, 200);
+        const hasLLM = t.llm_result ? '✅' : '';
+
+        return `
+            <div class="timeline-item" data-id="${t.id}">
+                <div class="timeline-time">${time}</div>
+                <div class="timeline-content">
+                    <div class="timeline-header">
+                        <span class="timeline-duration">⏱️ ${duration}</span>
+                        <span class="timeline-provider">${t.processed_by || 'local'}</span>
+                        ${hasLLM}
+                    </div>
+                    <div class="timeline-text">${preview}${t.text?.length > 200 ? '...' : ''}</div>
+                    <div class="timeline-actions">
+                        <button class="btn btn-small" onclick="showFullTranscription('${t.id}')">👁️ Ver</button>
+                        <button class="btn btn-small" onclick="openLLMModal('${t.id}')">🤖 LLM</button>
+                        <button class="btn btn-small btn-danger" onclick="deleteTranscription('${t.id}')">🗑️</button>
+                    </div>
+                </div>
+            </div>
+        `;
+    }).join('');
+
+    $('#history-count').textContent = `${transcriptions.length} transcrições`;
+}
+
+function showFullTranscription(id) {
+    const t = historyTranscriptions.find(x => x.id === id);
+    if (!t) return;
+
+    alert(`[${new Date(t.timestamp).toLocaleString('pt-BR')}]\n\n${t.text}\n\n${t.llm_result ? '--- LLM ---\n' + t.llm_result : ''}`);
+}
+
+function openLLMModal(id) {
+    const t = historyTranscriptions.find(x => x.id === id);
+    if (!t) return;
+
+    currentLLMTranscriptionId = id;
+    $('#llm-input-text').textContent = t.text;
+    $('#llm-result').textContent = '';
+    $('#llm-result-container').style.display = 'none';
+    $('#llm-modal').style.display = 'flex';
+}
+
+function closeLLMModal() {
+    $('#llm-modal').style.display = 'none';
+    currentLLMTranscriptionId = null;
+}
+
+async function processWithLLM() {
+    if (!currentLLMTranscriptionId) return;
+
+    const prompt = $('#llm-prompt').value;
+    const btn = $('#btn-process-llm');
+    btn.disabled = true;
+    btn.textContent = '⏳ Processando...';
+
+    try {
+        const result = await apiPost(`transcriptions/${currentLLMTranscriptionId}/llm`, { prompt });
+
+        if (result.success) {
+            $('#llm-result').textContent = result.result;
+            $('#llm-result-container').style.display = 'block';
+            showToast('Processamento LLM concluído!', 'success');
+
+            // Atualizar na lista local
+            const t = historyTranscriptions.find(x => x.id === currentLLMTranscriptionId);
+            if (t) t.llm_result = result.result;
+        } else {
+            showToast('Erro: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('Erro de conexão', 'error');
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '🚀 Processar';
+    }
+}
+
+async function deleteTranscription(id) {
+    if (!confirm('Deletar esta transcrição?')) return;
+
+    try {
+        const result = await fetch(`/api/transcriptions/${id}`, { method: 'DELETE' }).then(r => r.json());
+
+        if (result.success) {
+            showToast('Transcrição removida', 'success');
+            historyTranscriptions = historyTranscriptions.filter(t => t.id !== id);
+            renderHistoryTimeline(historyTranscriptions);
+        } else {
+            showToast('Erro: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('Erro de conexão', 'error');
+    }
+}
+
+async function exportDayJSON() {
+    const dateInput = $('#history-date');
+    const dateStr = dateInput?.value || new Date().toISOString().split('T')[0];
+
+    try {
+        const result = await apiGet(`transcriptions/daily/${dateStr}`);
+        if (result.success) {
+            const blob = new Blob([JSON.stringify(result, null, 2)], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `transcriptions_${dateStr}.json`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        showToast('Erro ao exportar', 'error');
+    }
+}
+
+async function exportDayTXT() {
+    const dateInput = $('#history-date');
+    const dateStr = dateInput?.value || new Date().toISOString().split('T')[0];
+
+    try {
+        const result = await apiGet(`transcriptions/daily/${dateStr}`);
+        if (result.success && result.transcriptions) {
+            const text = result.transcriptions
+                .map(t => `[${new Date(t.timestamp).toLocaleTimeString('pt-BR')}] ${t.text}`)
+                .join('\n\n');
+
+            const blob = new Blob([text], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = `transcriptions_${dateStr}.txt`;
+            a.click();
+            URL.revokeObjectURL(url);
+        }
+    } catch (error) {
+        showToast('Erro ao exportar', 'error');
+    }
+}
+
+async function consolidateDay() {
+    const dateInput = $('#history-date');
+    const dateStr = dateInput?.value;
+
+    try {
+        const result = await apiPost('transcriptions/consolidate', dateStr ? { date: dateStr } : {});
+        showToast(result.message || 'Consolidação concluída', result.success ? 'success' : 'warning');
+    } catch (error) {
+        showToast('Erro na consolidação', 'error');
+    }
+}
+
+function initHistoryTab() {
+    // Set default date to today
+    const dateInput = $('#history-date');
+    if (dateInput) {
+        dateInput.value = new Date().toISOString().split('T')[0];
+    }
+
+    // Event listeners
+    $('#btn-history-load')?.addEventListener('click', () => {
+        const date = $('#history-date')?.value;
+        if (date) loadHistoryByDate(date);
+    });
+
+    $('#btn-history-today')?.addEventListener('click', () => {
+        const today = new Date().toISOString().split('T')[0];
+        if ($('#history-date')) $('#history-date').value = today;
+        loadHistoryByDate(today);
+    });
+
+    $('#btn-history-search')?.addEventListener('click', () => {
+        const query = $('#history-search')?.value;
+        if (query) searchHistory(query);
+    });
+
+    $('#history-search')?.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+            const query = e.target.value;
+            if (query) searchHistory(query);
+        }
+    });
+
+    $('#btn-export-day-json')?.addEventListener('click', exportDayJSON);
+    $('#btn-export-day-txt')?.addEventListener('click', exportDayTXT);
+    $('#btn-consolidate')?.addEventListener('click', consolidateDay);
+    $('#btn-process-llm')?.addEventListener('click', processWithLLM);
+}
+
+// ==========================================================================
 // Init
 // ==========================================================================
 
@@ -2294,6 +2569,7 @@ document.addEventListener('DOMContentLoaded', () => {
     initListenerControls();
     initFilesTab();
     initLogsTab();
+    initHistoryTab();
     loadConfig();
 
     // Check systemd auto-start status

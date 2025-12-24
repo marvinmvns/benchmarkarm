@@ -1883,3 +1883,129 @@ input[type="checkbox"] {
         padding: 10px;
     }
 }
+
+/* ==========================================================================
+   History Tab
+   ========================================================================== */
+
+.history-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    align-items: flex-end;
+}
+
+.history-filters .form-group {
+    margin-bottom: 0;
+    flex: 1;
+    min-width: 150px;
+}
+
+.history-stats {
+    display: flex;
+    gap: 20px;
+    flex-wrap: wrap;
+}
+
+.stat-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 10px 20px;
+    background: var(--surface);
+    border-radius: 8px;
+    min-width: 80px;
+}
+
+.stat-value {
+    font-size: 1.5rem;
+    font-weight: bold;
+    color: var(--primary);
+}
+
+.stat-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+}
+
+.history-timeline {
+    max-height: 500px;
+    overflow-y: auto;
+}
+
+.timeline-item {
+    display: flex;
+    gap: 10px;
+    padding: 12px;
+    margin-bottom: 10px;
+    background: var(--surface);
+    border-radius: 8px;
+    border-left: 3px solid var(--primary);
+}
+
+.timeline-item:hover {
+    background: rgba(99, 102, 241, 0.1);
+}
+
+.timeline-time {
+    font-family: monospace;
+    font-size: 0.85rem;
+    color: var(--primary);
+    min-width: 70px;
+    font-weight: bold;
+}
+
+.timeline-content {
+    flex: 1;
+}
+
+.timeline-header {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 5px;
+    font-size: 0.8rem;
+}
+
+.timeline-duration {
+    color: var(--text-muted);
+}
+
+.timeline-provider {
+    background: var(--primary);
+    color: white;
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 0.7rem;
+}
+
+.timeline-text {
+    color: var(--text);
+    line-height: 1.4;
+    margin-bottom: 8px;
+}
+
+.timeline-actions {
+    display: flex;
+    gap: 5px;
+}
+
+.llm-preview {
+    background: var(--surface);
+    padding: 10px;
+    border-radius: 6px;
+    max-height: 150px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+    white-space: pre-wrap;
+    color: var(--text-muted);
+}
+
+.llm-result {
+    background: rgba(34, 197, 94, 0.1);
+    border: 1px solid var(--success);
+    padding: 15px;
+    border-radius: 8px;
+    margin-top: 10px;
+    white-space: pre-wrap;
+}
