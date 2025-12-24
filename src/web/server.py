@@ -481,6 +481,79 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
     def system_info():
         """Retorna informações do sistema."""
         return jsonify(get_system_info())
+    
+    @app.route("/api/system/autostart", methods=["GET"])
+    def get_autostart_status():
+        """Verifica se o serviço está habilitado para iniciar no boot."""
+        try:
+            import subprocess
+            service_name = "voice-processor"
+            
+            # Verificar se systemd está habilitado
+            result = subprocess.run(
+                ["systemctl", "is-enabled", service_name],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+            
+            enabled = result.returncode == 0 and "enabled" in result.stdout.strip()
+            
+            return jsonify({
+                "success": True,
+                "enabled": enabled,
+                "service": service_name,
+                "status": "enabled" if enabled else "disabled"
+            })
+        except FileNotFoundError:
+            # systemd não disponível
+            return jsonify({
+                "success": True,
+                "enabled": False,
+                "status": "not_available",
+                "message": "Systemd não disponível neste sistema"
+            })
+        except Exception as e:
+            logger.error(f"Erro ao verificar autostart: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+    
+    @app.route("/api/system/autostart", methods=["POST"])
+    def toggle_autostart():
+        """Habilita ou desabilita o serviço para iniciar no boot."""
+        try:
+            import subprocess
+            data = request.get_json() or {}
+            enable = data.get("enable", False)
+            service_name = "voice-processor"
+            
+            action = "enable" if enable else "disable"
+            
+            # Executar comando systemctl
+            result = subprocess.run(
+                ["sudo", "systemctl", action, service_name],
+                capture_output=True,
+                text=True,
+                timeout=10
+            )
+            
+            if result.returncode == 0:
+                logger.info(f"✅ Serviço {service_name} {action}d para autostart")
+                return jsonify({
+                    "success": True,
+                    "enabled": enable,
+                    "message": f"Serviço {'habilitado' if enable else 'desabilitado'} para iniciar no boot"
+                })
+            else:
+                error_msg = result.stderr.strip() or f"Falha ao {action} serviço"
+                logger.error(f"Erro ao {action} autostart: {error_msg}")
+                return jsonify({
+                    "success": False,
+                    "error": error_msg
+                }), 500
+                
+        except Exception as e:
+            logger.error(f"Erro ao alternar autostart: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
 
     @app.route("/api/restart", methods=["POST"])
     def restart_service():

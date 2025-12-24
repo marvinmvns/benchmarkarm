@@ -1771,7 +1771,65 @@ function initFilesTab() {
 }
 
 // ==========================================================================
-// Auto-Start Feature
+// Systemd Auto-Start Control
+// ==========================================================================
+
+async function checkSystemdAutoStart() {
+    try {
+        const result = await apiGet('system/autostart');
+        const checkbox = $('#autostart_enabled');
+        const statusDiv = $('#autostart-status');
+
+        if (checkbox && result.success) {
+            checkbox.checked = result.enabled;
+            if (statusDiv) {
+                if (result.status === 'not_available') {
+                    statusDiv.textContent = '⚠️ Systemd não disponível';
+                    statusDiv.style.color = 'var(--warning)';
+                } else {
+                    statusDiv.textContent = result.enabled ? '✅ Serviço habilitado no boot' : '❌ Serviço desabilitado no boot';
+                    statusDiv.style.color = result.enabled ? 'var(--success)' : 'var(--text-muted)';
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Erro ao verificar autostart:', error);
+    }
+}
+
+async function toggleAutoStart(enable) {
+    const statusDiv = $('#autostart-status');
+
+    try {
+        if (statusDiv) {
+            statusDiv.textContent = '⏳ Alterando...';
+            statusDiv.style.color = 'var(--primary)';
+        }
+
+        const result = await apiPost('system/autostart', { enable });
+
+        if (result.success) {
+            showToast(result.message, 'success');
+            if (statusDiv) {
+                statusDiv.textContent = enable ? '✅ Serviço habilitado no boot' : '❌ Serviço desabilitado no boot';
+                statusDiv.style.color = enable ? 'var(--success)' : 'var(--text-muted)';
+            }
+        } else {
+            showToast('Erro: ' + result.error, 'error');
+            // Reverter checkbox
+            const checkbox = $('#autostart_enabled');
+            if (checkbox) checkbox.checked = !enable;
+            checkSystemdAutoStart();
+        }
+    } catch (error) {
+        showToast('Erro de rede', 'error');
+        const checkbox = $('#autostart_enabled');
+        if (checkbox) checkbox.checked = !enable;
+    }
+}
+
+// ==========================================================================
+// USB Receiver Auto-Start (Auto-Start Feature)
 // ==========================================================================
 
 async function checkAutoStart() {
@@ -2238,7 +2296,10 @@ document.addEventListener('DOMContentLoaded', () => {
     initLogsTab();
     loadConfig();
 
-    // Check auto-start after config is loaded
+    // Check systemd auto-start status
+    checkSystemdAutoStart();
+
+    // Check USB receiver auto-start after config is loaded
     setTimeout(checkAutoStart, 1000);
 
     // Auto-refresh system info every 30s

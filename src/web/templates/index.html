@@ -44,6 +44,19 @@
                 <!-- Sistema usa as configurações de Whisper/LLM diretamente.
                      Fallback automático para local quando offline. -->
 
+                <!-- Auto-Start Section -->
+                <div class="status-card">
+                    <h3>🚀 Inicialização do Sistema</h3>
+                    <div class="form-group">
+                        <label class="toggle-label">
+                            <input type="checkbox" id="autostart_enabled" onchange="toggleAutoStart(this.checked)">
+                            <span class="toggle-text">Iniciar automaticamente no boot</span>
+                        </label>
+                        <small>Quando ativado, o serviço inicia automaticamente ao ligar o Raspberry Pi</small>
+                    </div>
+                    <div id="autostart-status" class="status-text" style="margin-top: 8px; font-size: 0.85rem;"></div>
+                </div>
+
                 <!-- Feature Toggles Section -->
                 <div class="status-card">
                     <h3>⚡ Feature Toggles (Economizar Recursos)</h3>
