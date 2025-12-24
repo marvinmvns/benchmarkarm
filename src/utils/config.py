@@ -53,6 +53,7 @@ class AudioConfig:
 @dataclass
 class WhisperConfig:
     """Configuração do Whisper."""
+    provider: str = "local"                  # local, openai, whisperapi
     model: str = "tiny"
     language: str = "pt"
     use_cpp: bool = True
@@ -60,7 +61,13 @@ class WhisperConfig:
     quantization: str = "q5_0"
     beam_size: int = 1
     suppress_blank: bool = True
-    stream_mode: bool = False              # Modo streaming (transcrição em tempo real)
+    stream_mode: bool = False                # Modo streaming (transcrição em tempo real)
+    # OpenAI Whisper API
+    openai_api_key: str = ""
+    openai_model: str = "whisper-1"
+    # WhisperAPI (servidor externo)
+    whisperapi_url: str = "http://127.0.0.1:3001"
+    whisperapi_timeout: int = 300            # Timeout em segundos
 
 
 @dataclass

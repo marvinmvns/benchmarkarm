@@ -92,6 +92,14 @@
 
                     <div class="form-group">
                         <label>
+                            <input type="checkbox" id="led_enabled" name="hardware.led_enabled" checked>
+                            💡 LEDs do ReSpeaker
+                        </label>
+                        <small>Pisca LEDs durante captura/processamento de áudio</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
                             <input type="checkbox" id="low_memory_mode" name="system.low_memory_mode" checked>
                             🔋 Modo Baixa Memória
                         </label>
@@ -155,9 +163,10 @@
                     <label for="whisper_provider">Provedor</label>
                     <select id="whisper_provider" name="whisper.provider">
                         <option value="local">🖥️ Local (whisper.cpp)</option>
+                        <option value="whisperapi">🌐 WhisperAPI (Servidor Externo)</option>
                         <option value="openai">☁️ OpenAI API</option>
                     </select>
-                    <small>Local: processa no dispositivo | OpenAI: mais rápido, precisa internet</small>
+                    <small>Local: no dispositivo | WhisperAPI: servidor externo | OpenAI: nuvem</small>
                 </div>
 
                 <!-- Local Whisper Config -->
@@ -201,6 +210,32 @@
                     </div>
                 </div>
 
+                <!-- WhisperAPI Config -->
+                <div id="whisper-whisperapi-config" class="config-section" style="display: none;">
+                    <h3>🌐 WhisperAPI (Servidor Externo)</h3>
+                    <p class="info-box">Servidor de transcrição externo. Ideal para offload de processamento.</p>
+
+                    <div class="form-group">
+                        <label for="whisperapi_url">🌐 URL do Servidor</label>
+                        <input type="text" id="whisperapi_url" name="whisper.whisperapi_url"
+                            value="http://127.0.0.1:3001" placeholder="http://IP:PORTA">
+                        <small>Ex: http://192.168.1.100:3001</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="whisperapi_timeout">Timeout (segundos)</label>
+                        <input type="number" id="whisperapi_timeout" name="whisper.whisperapi_timeout" min="30"
+                            max="600" value="300">
+                    </div>
+
+                    <div class="form-group">
+                        <button type="button" id="btn-test-whisperapi" class="btn btn-secondary">
+                            🧪 Testar Conexão
+                        </button>
+                        <span id="whisperapi-test-result"></span>
+                    </div>
+                </div>
+
                 <!-- OpenAI Whisper Config -->
                 <div id="whisper-openai-config" class="config-section" style="display: none;">
                     <h3>☁️ OpenAI Whisper API</h3>
@@ -230,6 +265,14 @@
                         <option value="es">Español</option>
                         <option value="">Auto-detectar</option>
                     </select>
+                </div>
+
+                <!-- Test Button -->
+                <div class="form-group">
+                    <button type="button" id="btn-test-whisper" class="btn btn-secondary">
+                        🧪 Testar Transcrição
+                    </button>
+                    <span id="whisper-test-result"></span>
                 </div>
             </section>
 

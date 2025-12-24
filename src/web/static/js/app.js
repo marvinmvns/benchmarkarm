@@ -143,6 +143,11 @@ function populateForm(cfg) {
         }
     }
 
+    // Hardware
+    if (cfg.hardware) {
+        $('#led_enabled').checked = cfg.hardware.led_enabled !== false;
+    }
+
     // Whisper
     if (cfg.whisper) {
         $('#whisper_provider').value = cfg.whisper.provider || 'local';
@@ -155,6 +160,13 @@ function populateForm(cfg) {
         $('#whisper_stream_mode').checked = cfg.whisper.stream_mode === true;
         if (cfg.whisper.openai_api_key) {
             $('#whisper_openai_api_key').value = cfg.whisper.openai_api_key;
+        }
+        // WhisperAPI config
+        if (cfg.whisper.whisperapi_url) {
+            $('#whisperapi_url').value = cfg.whisper.whisperapi_url;
+        }
+        if (cfg.whisper.whisperapi_timeout) {
+            $('#whisperapi_timeout').value = cfg.whisper.whisperapi_timeout;
         }
     }
 
@@ -256,6 +268,8 @@ function collectFormValues() {
     config.whisper.beam_size = parseInt($('#whisper_beam_size').value);
     config.whisper.stream_mode = $('#whisper_stream_mode').checked;
     config.whisper.openai_api_key = $('#whisper_openai_api_key').value;
+    config.whisper.whisperapi_url = $('#whisperapi_url').value;
+    config.whisper.whisperapi_timeout = parseInt($('#whisperapi_timeout').value);
 
     // LLM
     if (!config.llm) config.llm = {};
@@ -274,6 +288,10 @@ function collectFormValues() {
     config.llm.chatmock.reasoning_effort = $('#chatmock_reasoning').value;
     config.llm.chatmock.max_tokens = parseInt($('#chatmock_max_tokens').value);
     config.llm.chatmock.enable_web_search = $('#chatmock_web_search').checked;
+
+    // Hardware
+    if (!config.hardware) config.hardware = {};
+    config.hardware.led_enabled = $('#led_enabled').checked;
 
     // Offline Queue
     if (!config.offline_queue) config.offline_queue = {};
@@ -349,15 +367,20 @@ function updateLLMSection(provider) {
 function updateWhisperSection(provider) {
     const localConfig = $('#whisper-local-config');
     const openaiConfig = $('#whisper-openai-config');
+    const whisperapiConfig = $('#whisper-whisperapi-config');
 
-    if (localConfig && openaiConfig) {
-        if (provider === 'local') {
-            localConfig.style.display = 'block';
-            openaiConfig.style.display = 'none';
-        } else {
-            localConfig.style.display = 'none';
-            openaiConfig.style.display = 'block';
-        }
+    // Esconder todas as seções primeiro
+    if (localConfig) localConfig.style.display = 'none';
+    if (openaiConfig) openaiConfig.style.display = 'none';
+    if (whisperapiConfig) whisperapiConfig.style.display = 'none';
+
+    // Mostrar seção apropriada
+    if (provider === 'local') {
+        if (localConfig) localConfig.style.display = 'block';
+    } else if (provider === 'whisperapi') {
+        if (whisperapiConfig) whisperapiConfig.style.display = 'block';
+    } else if (provider === 'openai') {
+        if (openaiConfig) openaiConfig.style.display = 'block';
     }
 }
 
