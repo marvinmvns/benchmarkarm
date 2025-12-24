@@ -1076,6 +1076,37 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/files/transcriptions/all", methods=["DELETE"])
+    def delete_all_transcription_files():
+        """Deleta todos os arquivos de transcrição (.txt)."""
+        try:
+            processor = get_batch_processor()
+            if processor:
+                # Listar todos os arquivos TXT
+                transcriptions = processor.list_transcriptions()
+                deleted_count = 0
+                errors = []
+                
+                for t in transcriptions:
+                    filename = t.get('filename', '')
+                    if filename.endswith('.txt'):
+                        try:
+                            if processor.delete_transcription(filename):
+                                deleted_count += 1
+                        except Exception as e:
+                            errors.append(f"{filename}: {str(e)}")
+                
+                return jsonify({
+                    "success": True,
+                    "deleted_count": deleted_count,
+                    "errors": errors,
+                    "message": f"{deleted_count} arquivos deletados",
+                })
+            else:
+                return jsonify({"error": "Processador não disponível"}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
     @app.route("/api/files/search", methods=["GET"])
     def search_transcriptions():
         """Busca texto nas transcrições."""

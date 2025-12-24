@@ -1495,6 +1495,31 @@ async function deleteFile(filename) {
     }
 }
 
+async function deleteAllTranscriptions() {
+    const confirmMsg = 'Tem certeza que deseja apagar TODOS os arquivos de transcrição (.txt)?\n\nEsta ação não pode ser desfeita!';
+    if (!confirm(confirmMsg)) return;
+
+    try {
+        showToast('Apagando arquivos...', 'info');
+
+        const response = await fetch('/api/files/transcriptions/all', {
+            method: 'DELETE'
+        });
+        const result = await response.json();
+
+        if (result.success) {
+            showToast(`${result.deleted_count} arquivos deletados!`, 'success');
+            refreshTranscriptionFiles();
+            closeFileModal();
+        } else {
+            showToast(result.error || 'Erro ao deletar', 'error');
+        }
+    } catch (error) {
+        console.error('Erro ao deletar todos:', error);
+        showToast('Erro ao deletar arquivos', 'error');
+    }
+}
+
 async function searchTranscriptionFiles() {
     const query = $('#files-search-input').value.trim();
 
