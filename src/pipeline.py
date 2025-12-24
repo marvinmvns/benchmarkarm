@@ -10,7 +10,7 @@ from typing import Optional, Callable, Literal
 
 from .audio.capture import AudioCapture, AudioBuffer
 from .audio.vad import VoiceActivityDetector
-from .transcription.whisper import WhisperTranscriber, TranscriptionResult
+from .transcription.whisper import WhisperTranscriber, TranscriptionResult, get_transcriber
 from .llm.base import LLMProvider, LLMResponse
 from .llm.local import LocalLLM
 from .llm.api import OpenAIProvider, AnthropicProvider, OllamaProvider
@@ -108,17 +108,22 @@ class VoiceProcessor:
             self.vad = None
 
     def _init_transcriber(self) -> None:
-        """Inicializa transcritor Whisper."""
+        """Inicializa transcritor Whisper baseado no provider configurado."""
         whisper_config = self.config.whisper
-        self.transcriber = WhisperTranscriber(
-            model=whisper_config.model,
-            language=whisper_config.language,
-            use_cpp=whisper_config.use_cpp,
-            threads=whisper_config.threads,
-            beam_size=whisper_config.beam_size,
-            quantization=whisper_config.quantization,
-            stream_mode=getattr(whisper_config, 'stream_mode', False),
-        )
+        # Usar factory function que respeita o provider (local, whisperapi, openai)
+        config_dict = {
+            'provider': getattr(whisper_config, 'provider', 'local'),
+            'model': whisper_config.model,
+            'language': whisper_config.language,
+            'use_cpp': whisper_config.use_cpp,
+            'threads': max(1, whisper_config.threads),  # Mínimo 1 thread para usar swap
+            'beam_size': whisper_config.beam_size,
+            'stream_mode': getattr(whisper_config, 'stream_mode', False),
+            'whisperapi_url': getattr(whisper_config, 'whisperapi_url', 'http://127.0.0.1:3001'),
+            'whisperapi_timeout': getattr(whisper_config, 'whisperapi_timeout', 300),
+        }
+        self.transcriber = get_transcriber(config_dict)
+        logger.info(f"Transcritor inicializado: {config_dict.get('provider', 'local')}")
 
     def _init_llm(self) -> None:
         """Inicializa provedor LLM."""

@@ -505,3 +505,183 @@ class FasterWhisperTranscriber:
             model=f"faster-whisper-{self.model_name}",
             segments=segment_list,
         )
+
+
+class WhisperAPIClient:
+    """
+    Cliente para WhisperAPI (servidor externo de transcrição).
+    
+    Usa a API do repositório marvinmvns/whisperapi:
+    - POST /transcribe: enviar áudio
+    - GET /status/:jobId: verificar status
+    """
+    
+    def __init__(
+        self,
+        base_url: str = "http://127.0.0.1:3001",
+        language: str = "pt",
+        timeout: int = 300,
+    ):
+        self.base_url = base_url.rstrip("/")
+        self.language = language
+        self.timeout = timeout
+        logger.info(f"🌐 WhisperAPI inicializado: {self.base_url}")
+    
+    def transcribe(
+        self,
+        audio: "AudioBuffer | np.ndarray | str",
+        language: Optional[str] = None,
+    ) -> TranscriptionResult:
+        """Transcreve áudio usando WhisperAPI."""
+        import httpx
+        
+        start_time = time.time()
+        language = language or self.language
+        
+        # Preparar arquivo de áudio
+        if isinstance(audio, str):
+            audio_path = audio
+            cleanup = False
+        elif isinstance(audio, AudioBuffer):
+            audio_path = tempfile.mktemp(suffix=".wav")
+            self._save_audio(audio.data, audio_path)
+            cleanup = True
+        elif isinstance(audio, np.ndarray):
+            audio_path = tempfile.mktemp(suffix=".wav")
+            self._save_audio(audio, audio_path)
+            cleanup = True
+        else:
+            raise TypeError(f"Tipo de áudio não suportado: {type(audio)}")
+        
+        try:
+            # Enviar para WhisperAPI
+            with open(audio_path, 'rb') as f:
+                files = {'audio': (Path(audio_path).name, f, 'audio/wav')}
+                data = {'language': language}
+                
+                logger.info(f"🌐 Enviando áudio para WhisperAPI: {self.base_url}")
+                
+                response = httpx.post(
+                    f"{self.base_url}/transcribe",
+                    files=files,
+                    data=data,
+                    timeout=30,
+                )
+                response.raise_for_status()
+                result = response.json()
+            
+            job_id = result.get('jobId')
+            if not job_id:
+                raise RuntimeError("WhisperAPI não retornou jobId")
+            
+            logger.debug(f"Job criado: {job_id}")
+            
+            # Polling para resultado
+            poll_interval = 2
+            elapsed = 0
+            
+            while elapsed < self.timeout:
+                time.sleep(poll_interval)
+                elapsed += poll_interval
+                
+                status_response = httpx.get(
+                    f"{self.base_url}/status/{job_id}",
+                    timeout=10,
+                )
+                status_response.raise_for_status()
+                status_data = status_response.json()
+                
+                status = status_data.get('status')
+                logger.debug(f"Status job {job_id}: {status}")
+                
+                if status == 'completed':
+                    result_data = status_data.get('result', {})
+                    text = result_data.get('text', '')
+                    metadata = result_data.get('metadata', {})
+                    
+                    processing_time = time.time() - start_time
+                    
+                    return TranscriptionResult(
+                        text=text.strip(),
+                        language=metadata.get('language', language),
+                        duration=metadata.get('duration', 0),
+                        processing_time=processing_time,
+                        model="whisperapi",
+                    )
+                
+                elif status == 'failed':
+                    error = status_data.get('error', 'Erro desconhecido')
+                    raise RuntimeError(f"WhisperAPI falhou: {error}")
+                
+                # Aumentar intervalo progressivamente
+                poll_interval = min(poll_interval * 1.5, 10)
+            
+            raise TimeoutError(f"WhisperAPI timeout após {self.timeout}s")
+            
+        finally:
+            if cleanup and os.path.exists(audio_path):
+                try:
+                    os.unlink(audio_path)
+                except OSError:
+                    pass
+    
+    def _save_audio(self, audio: np.ndarray, path: str) -> None:
+        """Salva array numpy como WAV."""
+        import wave
+        
+        if audio.dtype != np.int16:
+            if audio.dtype in (np.float32, np.float64):
+                audio = (audio * 32767).astype(np.int16)
+            else:
+                audio = audio.astype(np.int16)
+        
+        with wave.open(path, 'wb') as wav:
+            wav.setnchannels(1)
+            wav.setsampwidth(2)
+            wav.setframerate(16000)
+            wav.writeframes(audio.tobytes())
+    
+    def is_available(self) -> bool:
+        """Verifica se WhisperAPI está disponível."""
+        import httpx
+        
+        try:
+            response = httpx.get(f"{self.base_url}/health", timeout=5)
+            return response.status_code == 200
+        except Exception:
+            return False
+
+
+def get_transcriber(config: dict) -> "WhisperTranscriber | WhisperAPIClient":
+    """
+    Factory function para criar transcritor baseado na configuração.
+    
+    Args:
+        config: Dicionário com configurações do Whisper
+        
+    Returns:
+        Instância do transcritor apropriado
+    """
+    provider = config.get('provider', 'local')
+    
+    if provider == 'whisperapi':
+        return WhisperAPIClient(
+            base_url=config.get('whisperapi_url', 'http://127.0.0.1:3001'),
+            language=config.get('language', 'pt'),
+            timeout=config.get('whisperapi_timeout', 300),
+        )
+    
+    elif provider == 'openai':
+        # OpenAI Whisper API (futuro)
+        logger.warning("OpenAI Whisper API não implementado, usando local")
+        # Fallthrough para local
+    
+    # Default: local whisper.cpp
+    return WhisperTranscriber(
+        model=config.get('model', 'tiny'),
+        language=config.get('language', 'pt'),
+        use_cpp=config.get('use_cpp', True),
+        threads=config.get('threads', 2),
+        beam_size=config.get('beam_size', 1),
+        stream_mode=config.get('stream_mode', False),
+    )
