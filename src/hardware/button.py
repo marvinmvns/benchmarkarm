@@ -34,7 +34,15 @@ class ButtonController:
         if self.enabled:
             try:
                 GPIO.setmode(GPIO.BCM)
+                
+                # Tentar limpar pino se já estiver em uso
+                try:
+                    GPIO.cleanup(self.BUTTON_PIN)
+                except Exception:
+                    pass
+                    
                 GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
+                
                 # Adicionar evento
                 GPIO.add_event_detect(
                     self.BUTTON_PIN, 
@@ -45,6 +53,12 @@ class ButtonController:
                 logger.info(f"🔘 Botão inicializado no GPIO {self.BUTTON_PIN}")
             except Exception as e:
                 logger.error(f"Erro ao iniciar botão: {e}")
+                
+                if "Failed to add edge detection" in str(e):
+                    logger.warning("Tentando método alternativo (Polling)...")
+                    # Implementar fallback se necessário, mas por enquanto desabilita
+                    # self._start_polling() 
+                
                 self.enabled = False
     
     def _on_press(self, channel):

@@ -246,18 +246,13 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
 
     # Configurar LEDs
     try:
-        from src.hardware.led import NeoPixelController
-        # Initial access to config without saving it? load_config is defined inside create_app...
-        # Wait, load_config and other helpers are defined AFTER init?
-        # I need to move load_config definition UP or copy logic.
-        # But setup_memory_logging works.
-        
+        from src.hardware.led import LEDController
         # Load logic inline to avoid issues
         with open(config_path, "r") as f:
             full_config = yaml.safe_load(f) or {}
             
         led_conf = full_config.get('hardware', {}).get('leds', {})
-        app.led_controller = NeoPixelController(
+        app.led_controller = LEDController(
             num_leds=led_conf.get('num_leds', 3),
             brightness=led_conf.get('brightness', 10),
             enabled=led_conf.get('enabled', True)
