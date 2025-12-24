@@ -139,6 +139,8 @@ class VoiceProcessor:
                 threads=local_cfg.threads,
                 max_tokens=local_cfg.max_tokens,
                 temperature=local_cfg.temperature,
+                use_server_mode=getattr(local_cfg, 'use_server_mode', True),
+                server_port=getattr(local_cfg, 'server_port', 8080),
             )
         elif provider == "openai":
             openai_cfg = llm_config.openai

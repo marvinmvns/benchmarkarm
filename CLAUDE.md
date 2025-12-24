@@ -8,6 +8,50 @@ Raspberry Pi Voice Processor - A complete voice processing system optimized for 
 
 **Primary target hardware**: Raspberry Pi Zero 2W (512MB RAM + 8-16GB swap), ReSpeaker 2-Mic or 4-Mic HAT
 
+## Remote Debugging & Testing
+
+When you need to test changes on the actual Raspberry Pi hardware or debug runtime errors:
+
+### SSH Access
+```bash
+# Connect to Raspberry Pi
+ssh bigfriend@192.168.31.124
+# Password: Amlb3fyk#
+
+# Navigate to project
+cd ~/benchmarkarm
+
+# Stop the service
+./run.sh stop
+
+# Pull latest changes from git
+git pull
+
+# Start the service
+./run.sh start
+
+# View logs in real-time
+./run.sh logs
+
+# Check status
+./run.sh status
+```
+
+**When to use SSH debugging:**
+- Testing hardware-specific features (ReSpeaker HAT, LEDs, buttons)
+- Debugging runtime errors that only occur on Pi Zero 2W
+- Verifying performance optimizations on low-memory device
+- Testing whisper.cpp or llama.cpp compiled binaries
+- After making significant configuration or code changes
+
+**Workflow:**
+1. Make code changes locally
+2. Commit and push to git
+3. SSH into Raspberry Pi
+4. Pull changes and restart service
+5. Monitor logs for errors
+6. Fix issues and repeat
+
 ## Common Commands
 
 ### Installation & Setup

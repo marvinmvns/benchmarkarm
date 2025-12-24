@@ -100,22 +100,34 @@ class BatchProcessor:
         logger.info(f"BatchProcessor inicializado: dir={self.audio_dir}")
     
     def _get_transcriber(self):
-        """Obtém transcritor Whisper (lazy loading)."""
+        """Obtém transcritor Whisper (lazy loading) - respeita provider configurado."""
         if self._transcriber is None:
             try:
-                from ..transcription.whisper import WhisperTranscriber
+                from ..transcription.whisper import get_transcriber
                 from ..utils.config import load_config
-                
+
                 config = load_config(self.config_path)
-                self._transcriber = WhisperTranscriber(
-                    model=config.whisper.model,
-                    language=config.whisper.language,
-                    use_cpp=config.whisper.use_cpp,
-                    threads=config.whisper.threads,
-                    beam_size=config.whisper.beam_size,
-                    quantization=config.whisper.quantization,
-                    stream_mode=getattr(config.whisper, 'stream_mode', False),
-                )
+                whisper_config = config.whisper
+
+                # CRÍTICO: Usar factory function que respeita o provider (local, whisperapi, openai)
+                config_dict = {
+                    'provider': getattr(whisper_config, 'provider', 'local'),
+                    'model': whisper_config.model,
+                    'language': whisper_config.language,
+                    'use_cpp': whisper_config.use_cpp,
+                    'threads': whisper_config.threads,
+                    'beam_size': whisper_config.beam_size,
+                    'quantization': whisper_config.quantization,
+                    'stream_mode': getattr(whisper_config, 'stream_mode', False),
+                }
+
+                # Se for API provider, adicionar configurações de API
+                if hasattr(config, 'whisper_api'):
+                    config_dict['api_url'] = getattr(config.whisper_api, 'api_url', '')
+                    config_dict['api_key'] = getattr(config.whisper_api, 'api_key', '')
+
+                self._transcriber = get_transcriber(config_dict)
+                logger.info(f"BatchProcessor usando Whisper provider: {config_dict.get('provider', 'local')}")
             except Exception as e:
                 logger.error(f"Erro ao criar transcritor: {e}")
                 raise
