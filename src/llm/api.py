@@ -383,7 +383,11 @@ class ChatMockProvider(LLMProvider):
             enable_web_search: Habilitar busca web
         """
         super().__init__(model, max_tokens, temperature)
-        self.base_url = base_url.rstrip("/")
+        # Auto-append /v1 if not present (user-friendly)
+        base_url = base_url.rstrip("/")
+        if not base_url.endswith("/v1"):
+            base_url = base_url + "/v1"
+        self.base_url = base_url
         self.reasoning_effort = reasoning_effort
         self.enable_web_search = enable_web_search
         self._client = None
