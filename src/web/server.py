@@ -2116,8 +2116,8 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/files/search", methods=["GET"])
-    def search_transcriptions():
-        """Busca texto nas transcrições."""
+    def search_files_content():
+        """Busca texto nos arquivos de transcrição."""
         try:
             query = request.args.get("q", "").lower()
             if not query:
