@@ -266,6 +266,11 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         return jsonify(config)
 
     @app.route("/api/config", methods=["POST"])
+    @app.after_request
+    def add_header(response):
+        response.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
+        return response
+
     def update_config():
         """Atualiza configuração."""
         try:
@@ -273,8 +278,11 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             if not new_config:
                 return jsonify({"error": "Configuração vazia"}), 400
 
+            logger.info(f"Recebendo atualização de config: {new_config}")
+
             # Carregar config atual para fazer merge
             current_config = load_config()
+            logger.info(f"Config atual antes do merge: {current_config}")
             
             # Recursive update helper
             def deep_update(target, source):
@@ -286,10 +294,13 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
                 return target
 
             updated_config = deep_update(current_config, new_config)
+            logger.info(f"Config após merge: {updated_config}")
 
             if save_config(updated_config):
+                logger.info("Configuração salva com sucesso")
                 return jsonify({"success": True, "message": "Configuração salva!"})
             else:
+                logger.error("Falha ao salvar configuração")
                 return jsonify({"error": "Erro ao salvar configuração"}), 500
         except Exception as e:
             logger.error(f"Erro no update_config: {e}")

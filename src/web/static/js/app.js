@@ -58,7 +58,7 @@ function setNestedValue(obj, path, value) {
 // ==========================================================================
 
 async function apiGet(endpoint) {
-    const response = await fetch(`/api/${endpoint}`);
+    const response = await fetch(`/api/${endpoint}`, { cache: 'no-store' });
     return response.json();
 }
 
@@ -525,8 +525,8 @@ function initEventListeners() {
         $('#llm_temperature_value').textContent = e.target.value;
     });
 
-    // Test audio
-    $('#btn-test-audio').addEventListener('click', testAudio);
+    // Test audio - Obsoleto (substituído por Hardware Tests)
+    // $('#btn-test-audio')?.addEventListener('click', testAudio);
 
     // Refresh buttons
     $('#btn-refresh-system').addEventListener('click', refreshSystemInfo);
