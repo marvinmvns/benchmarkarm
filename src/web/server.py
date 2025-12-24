@@ -685,18 +685,38 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             listener = get_continuous_listener()
             if listener:
                 listener.start()
-                return jsonify({
-                    "success": True,
-                    "message": "Escuta contínua iniciada",
-                    "status": listener.status,
-                })
+                
+                # Verificar se realmente iniciou
+                if listener.status.get("running", False):
+                    return jsonify({
+                        "success": True,
+                        "message": "Escuta contínua iniciada",
+                        "status": listener.status,
+                    })
+                else:
+                    # Listener não iniciou - verificar por que
+                    usb_config = listener.usb_config if hasattr(listener, 'usb_config') else None
+                    error_msg = "Falha ao iniciar escuta"
+                    
+                    if usb_config:
+                        if not usb_config.enabled:
+                            error_msg = "Escuta contínua não está habilitada. Ative 'Habilitar Escuta via ReSpeaker' nas configurações."
+                        elif not usb_config.continuous_listen:
+                            error_msg = "Modo de escuta contínua não está ativo. Ative 'Escuta Contínua Automática' nas configurações."
+                    
+                    return jsonify({
+                        "success": False,
+                        "error": error_msg,
+                        "status": listener.status,
+                    }), 400
             else:
                 return jsonify({
                     "success": False,
                     "error": "Módulos de áudio não disponíveis. Execute no Raspberry Pi.",
                 }), 400
         except Exception as e:
-            return jsonify({"error": str(e)}), 500
+            logger.error(f"Erro ao iniciar listener: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
 
     @app.route("/api/listener/stop", methods=["POST"])
     def listener_stop():
