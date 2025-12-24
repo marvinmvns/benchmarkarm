@@ -1009,7 +1009,7 @@ class WhisperAPIClient:
         start_time = time.time()
         last_status = ""
         not_found_retries = 0
-        max_not_found_retries = 5  # Permitir até 5 tentativas se job não for encontrado
+        max_not_found_retries = 10  # Aumentado para 10 retries se job inconsistente
         
         logger.info(f"⏳ Aguardando conclusão do job {job_id}... (timeout: {max_wait}s)")
         

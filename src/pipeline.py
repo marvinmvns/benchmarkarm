@@ -245,13 +245,14 @@ class VoiceProcessor:
         except Exception as e:
             error_str = str(e).lower()
             
-            # Erros de conexão que justificam fallback para local
+            # Erros de conexão ou job perdido que justificam fallback para local
             is_connection_error = any(x in error_str for x in [
                 'connection refused', 'connection error', 'timeout',
                 'errno 111', 'unreachable', 'network', 'refused',
+                'job not found', 'job não encontrado'
             ])
             
-            if is_connection_error and self.config.whisper.provider != "local":
+            if (is_connection_error or isinstance(e, ValueError)) and self.config.whisper.provider != "local":
                 logger.warning(f"⚠️ WhisperAPI falhou ({e}), tentando fallback para local...")
                 
                 try:
