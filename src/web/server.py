@@ -1139,26 +1139,148 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
 
     @app.route("/api/test/whisperapi_connection", methods=["POST"])
     def test_whisperapi_connection():
-        """Testa conexão com WhisperAPI."""
+        """Testa conexão com WhisperAPI usando o cliente completo."""
+        try:
+            config = load_config()
+            whisper_config = config.get("whisper", {})
+            url = whisper_config.get("whisperapi_url")
+            
+            if not url:
+                return jsonify({"error": "URL WhisperAPI não configurada"}), 400
+            
+            from ..transcription.whisper import WhisperAPIClient
+            
+            client = WhisperAPIClient(
+                base_url=url,
+                language=whisper_config.get("language", "pt"),
+                timeout=whisper_config.get("whisperapi_timeout", 300),
+            )
+            
+            try:
+                # Health check
+                health = client.health_check()
+                if health.get("status") == "offline":
+                    return jsonify({
+                        "error": f"WhisperAPI offline: {health.get('error', 'não responde')}"
+                    }), 503
+                
+                # Obter informações adicionais
+                formats = client.get_supported_formats()
+                queue_stats = client.get_queue_stats()
+                model_info = client.get_model_info()
+                
+                return jsonify({
+                    "success": True,
+                    "message": "WhisperAPI conectado com sucesso",
+                    "health": health,
+                    "formats": formats,
+                    "queue": queue_stats,
+                    "model": model_info,
+                })
+                
+            except Exception as conn_err:
+                return jsonify({
+                    "error": f"Falha na conexão: {str(conn_err)}"
+                }), 500
+            finally:
+                client.close()
+
+        except Exception as e:
+            logger.error(f"Erro no teste WhisperAPI: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/whisperapi/info", methods=["GET"])
+    def whisperapi_info():
+        """Retorna informações completas do servidor WhisperAPI."""
+        try:
+            config = load_config()
+            whisper_config = config.get("whisper", {})
+            url = whisper_config.get("whisperapi_url")
+            
+            if not url:
+                return jsonify({"error": "URL WhisperAPI não configurada"}), 400
+            
+            from ..transcription.whisper import WhisperAPIClient
+            
+            client = WhisperAPIClient(base_url=url)
+            
+            try:
+                return jsonify({
+                    "success": True,
+                    "health": client.health_check(),
+                    "formats": client.get_supported_formats(),
+                    "queue": client.get_queue_stats(),
+                    "model": client.get_model_info(),
+                    "system": client.get_system_report(),
+                })
+            finally:
+                client.close()
+                
+        except Exception as e:
+            logger.error(f"Erro ao obter info WhisperAPI: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/whisperapi/jobs", methods=["GET"])
+    def whisperapi_jobs():
+        """Lista status de todos os jobs do WhisperAPI."""
         try:
             config = load_config()
             url = config.get("whisper", {}).get("whisperapi_url")
-            if not url:
-                return jsonify({"error": "URL não configurada"}), 400
             
-            import requests
-            # Tentar conectar (assumindo endpoint /health ou raiz)
+            if not url:
+                return jsonify({"error": "URL WhisperAPI não configurada"}), 400
+            
+            from ..transcription.whisper import WhisperAPIClient
+            
+            client = WhisperAPIClient(base_url=url)
+            
             try:
-                # Se url termina com /v1/audio/transcriptions, pegar base
-                base_url = url.split("/v1")[0]
-                resp = requests.get(base_url, timeout=5)
-                # Aceitar qualquer resposta 200-404 como "servidor existe"
-                return jsonify({"success": True, "message": f"Conectado: {resp.status_code}"})
-            except Exception as conn_err:
-                 # Tentar endpoint específico se base falhar
-                 return jsonify({"error": f"Falha na conexão: {str(conn_err)}"}), 500
-
+                completed = request.args.get("completed", "false").lower() == "true"
+                
+                if completed:
+                    jobs = client.get_completed_jobs()
+                else:
+                    jobs = client.get_all_jobs_status()
+                
+                return jsonify({
+                    "success": True,
+                    "jobs": jobs,
+                    "total": len(jobs),
+                })
+            finally:
+                client.close()
+                
         except Exception as e:
+            logger.error(f"Erro ao listar jobs WhisperAPI: {e}")
+            return jsonify({"error": str(e)}), 500
+    
+    @app.route("/api/whisperapi/job/<job_id>", methods=["GET"])
+    def whisperapi_job_status(job_id):
+        """Retorna status de um job específico do WhisperAPI."""
+        try:
+            config = load_config()
+            url = config.get("whisper", {}).get("whisperapi_url")
+            
+            if not url:
+                return jsonify({"error": "URL WhisperAPI não configurada"}), 400
+            
+            from ..transcription.whisper import WhisperAPIClient
+            
+            client = WhisperAPIClient(base_url=url)
+            
+            try:
+                status = client.get_job_status(job_id)
+                return jsonify({
+                    "success": True,
+                    "job": status,
+                })
+            except ValueError as e:
+                return jsonify({"error": str(e)}), 404
+            finally:
+                client.close()
+                
+        except Exception as e:
+            logger.error(f"Erro ao obter status do job {job_id}: {e}")
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/test/whisper_transcription", methods=["POST"])

@@ -683,11 +683,19 @@ class FasterWhisperTranscriber:
 
 class WhisperAPIClient:
     """
-    Cliente para WhisperAPI (servidor externo de transcrição).
+    Cliente completo para WhisperAPI (servidor externo de transcrição).
     
-    Usa a API do repositório marvinmvns/whisperapi:
-    - POST /transcribe: enviar áudio
-    - GET /status/:jobId: verificar status
+    Endpoints suportados:
+    - POST /transcribe: enviar áudio para transcrição
+    - GET /status/:jobId: verificar status do job
+    - GET /health: verificar saúde do servidor
+    - GET /formats: formatos de áudio suportados
+    - GET /queue-estimate: estatísticas da fila
+    - GET /estimate: estimativa de tempo
+    - GET /completed-jobs: jobs concluídos
+    - GET /all-status: status de todos os jobs
+    - GET /system-report: relatório do sistema
+    - GET /model-info: informações do modelo
     """
     
     def __init__(
@@ -695,112 +703,414 @@ class WhisperAPIClient:
         base_url: str = "http://127.0.0.1:3001",
         language: str = "pt",
         timeout: int = 300,
+        word_timestamps: bool = False,
+        translate: bool = False,
+        cleanup: bool = True,
     ):
+        """
+        Inicializa o cliente WhisperAPI.
+        
+        Args:
+            base_url: URL base do servidor WhisperAPI
+            language: Idioma padrão para transcrição ('pt', 'en', 'auto', etc.)
+            timeout: Timeout máximo para aguardar transcrição (segundos)
+            word_timestamps: Se True, retorna timestamps por palavra
+            translate: Se True, traduz para inglês
+            cleanup: Se True, servidor limpa arquivos após processar
+        """
         self.base_url = base_url.rstrip("/")
         self.language = language
         self.timeout = timeout
+        self.word_timestamps = word_timestamps
+        self.translate = translate
+        self.cleanup = cleanup
+        self._http_client = None
         logger.info(f"🌐 WhisperAPI inicializado: {self.base_url}")
+    
+    def _get_client(self):
+        """Retorna cliente HTTP (lazy initialization)."""
+        if self._http_client is None:
+            import httpx
+            self._http_client = httpx.Client(
+                base_url=self.base_url,
+                timeout=60.0,
+            )
+        return self._http_client
+    
+    # ==========================================================================
+    # Health & Info Endpoints
+    # ==========================================================================
+    
+    def health_check(self) -> dict:
+        """
+        Verifica saúde do servidor.
+        
+        Returns:
+            Dict com status do servidor e endpoints disponíveis
+        """
+        try:
+            client = self._get_client()
+            response = client.get("/health")
+            response.raise_for_status()
+            data = response.json()
+            logger.info(f"✅ WhisperAPI online: {data.get('status', 'ok')}")
+            return data
+        except Exception as e:
+            logger.error(f"❌ WhisperAPI não responde: {e}")
+            return {"status": "offline", "error": str(e)}
+    
+    def is_available(self) -> bool:
+        """Verifica se WhisperAPI está disponível."""
+        try:
+            result = self.health_check()
+            return result.get("status") != "offline"
+        except Exception:
+            return False
+    
+    def get_supported_formats(self) -> list:
+        """
+        Obtém formatos de áudio suportados pelo servidor.
+        
+        Returns:
+            Lista de extensões suportadas (ex: ['.wav', '.mp3', '.m4a'])
+        """
+        try:
+            client = self._get_client()
+            response = client.get("/formats")
+            response.raise_for_status()
+            data = response.json()
+            formats = data.get("supportedFormats", [])
+            logger.info(f"📋 Formatos suportados: {', '.join(formats)}")
+            return formats
+        except Exception as e:
+            logger.error(f"❌ Erro ao obter formatos: {e}")
+            return [".wav", ".mp3", ".m4a", ".ogg", ".flac"]  # Fallback padrão
+    
+    def get_queue_stats(self) -> dict:
+        """
+        Obtém estatísticas da fila de processamento.
+        
+        Returns:
+            Dict com queueLength, activeJobs, availableWorkers, 
+            totalWorkers, averageProcessingTime, estimatedWaitTime
+        """
+        try:
+            client = self._get_client()
+            response = client.get("/queue-estimate")
+            response.raise_for_status()
+            stats = response.json()
+            logger.info(
+                f"📊 Fila: {stats.get('queueLength', 0)} pendentes, "
+                f"{stats.get('activeJobs', 0)} ativos, "
+                f"espera: {stats.get('estimatedWaitTime', 0)}s"
+            )
+            return stats
+        except Exception as e:
+            logger.error(f"❌ Erro ao obter estatísticas: {e}")
+            return {}
+    
+    def get_model_info(self) -> dict:
+        """
+        Obtém informações do modelo Whisper em uso no servidor.
+        
+        Returns:
+            Dict com nome do modelo, tamanho, etc.
+        """
+        try:
+            client = self._get_client()
+            response = client.get("/model-info")
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.warning(f"Erro ao obter info do modelo: {e}")
+            return {}
+    
+    def get_system_report(self) -> dict:
+        """
+        Obtém relatório completo do sistema (CPU, memória, etc).
+        
+        Returns:
+            Dict com métricas do sistema servidor
+        """
+        try:
+            client = self._get_client()
+            response = client.get("/system-report")
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            logger.warning(f"Erro ao obter relatório do sistema: {e}")
+            return {}
+    
+    # ==========================================================================
+    # Job Management
+    # ==========================================================================
+    
+    def get_job_status(self, job_id: str) -> dict:
+        """
+        Verifica status de um job específico.
+        
+        Args:
+            job_id: ID do job retornado por transcribe()
+            
+        Returns:
+            Dict com status ('pending', 'processing', 'completed', 'failed'),
+            result (se completed), error (se failed)
+        """
+        try:
+            client = self._get_client()
+            response = client.get(f"/status/{job_id}")
+            if response.status_code == 404:
+                raise ValueError(f"Job não encontrado: {job_id}")
+            response.raise_for_status()
+            return response.json()
+        except ValueError:
+            raise
+        except Exception as e:
+            raise RuntimeError(f"Erro ao verificar status: {e}")
+    
+    def get_all_jobs_status(self) -> list:
+        """
+        Obtém status de todos os jobs.
+        
+        Returns:
+            Lista de dicts com status de cada job
+        """
+        try:
+            client = self._get_client()
+            response = client.get("/all-status")
+            response.raise_for_status()
+            return response.json().get("jobs", [])
+        except Exception as e:
+            logger.warning(f"Erro ao obter status de todos os jobs: {e}")
+            return []
+    
+    def get_completed_jobs(self) -> list:
+        """
+        Obtém lista de jobs concluídos.
+        
+        Returns:
+            Lista de jobs completados
+        """
+        try:
+            client = self._get_client()
+            response = client.get("/completed-jobs")
+            response.raise_for_status()
+            return response.json().get("jobs", [])
+        except Exception as e:
+            logger.warning(f"Erro ao obter jobs concluídos: {e}")
+            return []
+    
+    # ==========================================================================
+    # Transcription
+    # ==========================================================================
+    
+    def upload_audio(
+        self,
+        audio_path: str,
+        language: Optional[str] = None,
+        translate: Optional[bool] = None,
+        word_timestamps: Optional[bool] = None,
+        cleanup: Optional[bool] = None,
+    ) -> dict:
+        """
+        Envia arquivo de áudio para transcrição (não bloqueia).
+        
+        Args:
+            audio_path: Caminho do arquivo de áudio
+            language: Idioma ('pt', 'en', 'auto', etc.)
+            translate: Se True, traduz para inglês
+            word_timestamps: Se True, retorna timestamps por palavra
+            cleanup: Se True, servidor limpa arquivo após processar
+            
+        Returns:
+            Dict com jobId e estimatedWaitTime
+        """
+        if not os.path.exists(audio_path):
+            raise FileNotFoundError(f"Arquivo não encontrado: {audio_path}")
+        
+        # Usar padrões da instância se não especificado
+        language = language or self.language
+        translate = translate if translate is not None else self.translate
+        word_timestamps = word_timestamps if word_timestamps is not None else self.word_timestamps
+        cleanup = cleanup if cleanup is not None else self.cleanup
+        
+        try:
+            client = self._get_client()
+            
+            with open(audio_path, 'rb') as f:
+                files = {'audio': (Path(audio_path).name, f, 'audio/wav')}
+                data = {
+                    'language': language,
+                    'translate': str(translate).lower(),
+                    'wordTimestamps': str(word_timestamps).lower(),
+                    'cleanup': str(cleanup).lower(),
+                }
+                
+                logger.info(f"📤 Enviando áudio: {Path(audio_path).name}")
+                
+                response = client.post(
+                    "/transcribe",
+                    files=files,
+                    data=data,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                result = response.json()
+            
+            job_id = result.get('jobId')
+            estimated_wait = result.get('estimatedWaitTime', 0)
+            
+            logger.info(f"✅ Upload OK! Job ID: {job_id}, Espera: {estimated_wait}s")
+            
+            return result
+            
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"❌ Erro no upload: {error_msg}")
+            raise RuntimeError(f"Upload falhou: {error_msg}")
+    
+    def wait_for_completion(
+        self,
+        job_id: str,
+        poll_interval: float = 3.0,
+        max_wait_time: Optional[float] = None,
+    ) -> dict:
+        """
+        Aguarda conclusão de um job (polling).
+        
+        Args:
+            job_id: ID do job
+            poll_interval: Intervalo entre verificações (segundos)
+            max_wait_time: Tempo máximo de espera (usa self.timeout se None)
+            
+        Returns:
+            Dict com resultado completo da transcrição
+        """
+        max_wait = max_wait_time or self.timeout
+        start_time = time.time()
+        last_status = ""
+        
+        logger.info(f"⏳ Aguardando conclusão do job {job_id}...")
+        
+        while (time.time() - start_time) < max_wait:
+            try:
+                status_data = self.get_job_status(job_id)
+                status = status_data.get('status', '')
+                
+                if status != last_status:
+                    logger.debug(f"📊 Status: {status}")
+                    last_status = status
+                
+                if status == 'completed':
+                    logger.info("✅ Transcrição concluída com sucesso!")
+                    return status_data
+                
+                if status == 'failed':
+                    error = status_data.get('error', 'Erro desconhecido')
+                    raise RuntimeError(f"Transcrição falhou: {error}")
+                
+                # Esperar antes de próxima verificação
+                time.sleep(poll_interval)
+                
+                # Aumentar intervalo progressivamente (até 10s)
+                poll_interval = min(poll_interval * 1.2, 10.0)
+                
+            except ValueError as e:
+                raise e
+            except RuntimeError as e:
+                raise e
+            except Exception as e:
+                logger.warning(f"Erro no polling: {e}")
+                time.sleep(poll_interval)
+        
+        raise TimeoutError(f"Timeout após {max_wait}s aguardando conclusão")
     
     def transcribe(
         self,
         audio: "AudioBuffer | np.ndarray | str",
         language: Optional[str] = None,
+        translate: Optional[bool] = None,
+        word_timestamps: Optional[bool] = None,
     ) -> TranscriptionResult:
-        """Transcreve áudio usando WhisperAPI."""
-        import httpx
+        """
+        Transcreve áudio usando WhisperAPI (método completo bloqueante).
         
+        Args:
+            audio: AudioBuffer, numpy array, ou caminho do arquivo
+            language: Idioma ('pt', 'en', 'auto', etc.)
+            translate: Se True, traduz para inglês
+            word_timestamps: Se True, inclui timestamps por palavra
+            
+        Returns:
+            TranscriptionResult com texto, idioma, duração, etc.
+        """
         start_time = time.time()
         language = language or self.language
         
         # Preparar arquivo de áudio
         if isinstance(audio, str):
             audio_path = audio
-            cleanup = False
+            cleanup_file = False
         elif isinstance(audio, AudioBuffer):
             audio_path = tempfile.mktemp(suffix=".wav")
             self._save_audio(audio.data, audio_path)
-            cleanup = True
+            cleanup_file = True
         elif isinstance(audio, np.ndarray):
             audio_path = tempfile.mktemp(suffix=".wav")
             self._save_audio(audio, audio_path)
-            cleanup = True
+            cleanup_file = True
         else:
             raise TypeError(f"Tipo de áudio não suportado: {type(audio)}")
         
         try:
-            # Enviar para WhisperAPI
-            with open(audio_path, 'rb') as f:
-                files = {'audio': (Path(audio_path).name, f, 'audio/wav')}
-                data = {'language': language}
-                
-                logger.info(f"🌐 Enviando áudio para WhisperAPI: {self.base_url}")
-                
-                response = httpx.post(
-                    f"{self.base_url}/transcribe",
-                    files=files,
-                    data=data,
-                    timeout=30,
-                )
-                response.raise_for_status()
-                result = response.json()
+            # 1. Upload do áudio
+            upload_result = self.upload_audio(
+                audio_path,
+                language=language,
+                translate=translate,
+                word_timestamps=word_timestamps,
+            )
             
-            job_id = result.get('jobId')
+            job_id = upload_result.get('jobId')
             if not job_id:
                 raise RuntimeError("WhisperAPI não retornou jobId")
             
-            logger.debug(f"Job criado: {job_id}")
+            # 2. Aguardar conclusão
+            result = self.wait_for_completion(job_id)
             
-            # Polling para resultado
-            poll_interval = 2
-            elapsed = 0
+            # 3. Extrair resultado
+            result_data = result.get('result', {})
+            text = result_data.get('text', '')
+            metadata = result_data.get('metadata', {})
             
-            while elapsed < self.timeout:
-                time.sleep(poll_interval)
-                elapsed += poll_interval
-                
-                status_response = httpx.get(
-                    f"{self.base_url}/status/{job_id}",
-                    timeout=10,
-                )
-                status_response.raise_for_status()
-                status_data = status_response.json()
-                
-                status = status_data.get('status')
-                logger.debug(f"Status job {job_id}: {status}")
-                
-                if status == 'completed':
-                    result_data = status_data.get('result', {})
-                    text = result_data.get('text', '')
-                    metadata = result_data.get('metadata', {})
-                    
-                    processing_time = time.time() - start_time
-                    
-                    return TranscriptionResult(
-                        text=text.strip(),
-                        language=metadata.get('language', language),
-                        duration=metadata.get('duration', 0),
-                        processing_time=processing_time,
-                        model="whisperapi",
-                    )
-                
-                elif status == 'failed':
-                    error = status_data.get('error', 'Erro desconhecido')
-                    raise RuntimeError(f"WhisperAPI falhou: {error}")
-                
-                # Aumentar intervalo progressivamente
-                poll_interval = min(poll_interval * 1.5, 10)
+            processing_time = time.time() - start_time
+            server_processing_time = result_data.get('processingTime', processing_time)
             
-            raise TimeoutError(f"WhisperAPI timeout após {self.timeout}s")
+            # Log resultado
+            logger.info(
+                f"📝 Transcrição: {len(text)} chars, "
+                f"idioma: {metadata.get('language', language)}, "
+                f"tempo: {server_processing_time:.1f}s"
+            )
+            
+            return TranscriptionResult(
+                text=text.strip(),
+                language=metadata.get('language', language),
+                duration=metadata.get('duration', 0),
+                processing_time=processing_time,
+                model="whisperapi",
+                segments=result_data.get('segments'),
+            )
             
         finally:
-            if cleanup and os.path.exists(audio_path):
+            if cleanup_file and os.path.exists(audio_path):
                 try:
                     os.unlink(audio_path)
                 except OSError:
                     pass
     
     def _save_audio(self, audio: np.ndarray, path: str) -> None:
-        """Salva array numpy como WAV."""
+        """Salva array numpy como WAV (16kHz, mono, 16-bit)."""
         import wave
         
         if audio.dtype != np.int16:
@@ -815,15 +1125,18 @@ class WhisperAPIClient:
             wav.setframerate(16000)
             wav.writeframes(audio.tobytes())
     
-    def is_available(self) -> bool:
-        """Verifica se WhisperAPI está disponível."""
-        import httpx
-        
-        try:
-            response = httpx.get(f"{self.base_url}/health", timeout=5)
-            return response.status_code == 200
-        except Exception:
-            return False
+    def close(self):
+        """Fecha conexões HTTP."""
+        if self._http_client:
+            self._http_client.close()
+            self._http_client = None
+    
+    def __enter__(self):
+        return self
+    
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self.close()
+        return False
 
 
 def get_transcriber(config: dict) -> "WhisperTranscriber | WhisperAPIClient":
