@@ -1923,6 +1923,10 @@ async function testWhisperAPIConnection() {
 
 async function testWhisperTranscription() {
     const btn = $('#btn-test-whisper');
+    const stateBox = $('#whisper-test-state');
+    const stateIcon = $('#test-state-icon');
+    const stateMessage = $('#test-state-message');
+    const stateCountdown = $('#test-state-countdown');
     const resultDiv = $('#whisper-test-result');
     const textDiv = $('#whisper-test-text');
     const timingDiv = $('#whisper-test-timing');
@@ -1931,32 +1935,56 @@ async function testWhisperTranscription() {
     const originalText = btn.textContent;
     const duration = parseInt(durationSelect?.value || '5', 10);
 
+    // Reset states
     btn.disabled = true;
-    btn.textContent = `🎤 Gravando ${duration}s...`;
     resultDiv.style.display = 'none';
     resultDiv.classList.remove('error');
+    stateBox.className = 'test-state-box';
+    stateBox.style.display = 'block';
+
+    // Phase 1: Prepare (show prompt to speak)
+    stateIcon.textContent = '🎙️';
+    stateMessage.textContent = '🔊 FALE AGORA!';
+    stateCountdown.textContent = duration + 's';
+    stateBox.classList.add('recording');
 
     try {
-        // Atualizar botão durante gravação
+        // Start countdown animation
         let countdown = duration;
         const countdownInterval = setInterval(() => {
             countdown--;
             if (countdown > 0) {
-                btn.textContent = `🎤 Gravando ${countdown}s...`;
+                stateCountdown.textContent = countdown + 's';
             } else {
-                btn.textContent = '⏳ Transcrevendo...';
+                // Phase 2: Transcribing
+                stateBox.classList.remove('recording');
+                stateBox.classList.add('transcribing');
+                stateIcon.textContent = '⏳';
+                stateMessage.textContent = 'Transcrevendo...';
+                stateCountdown.textContent = '';
                 clearInterval(countdownInterval);
             }
         }, 1000);
 
+        // Make API call (this runs in parallel with countdown)
         const result = await apiPost('test/whisper_transcription', { duration });
         clearInterval(countdownInterval);
 
         if (result.success) {
-            // Exibir resultado
+            // Phase 3: Success
+            stateBox.classList.remove('recording', 'transcribing');
+            stateBox.classList.add('success');
+            stateIcon.textContent = '✅';
+            stateMessage.textContent = 'Transcrição concluída!';
+            stateCountdown.textContent = '';
+
+            // Wait a moment then show result
+            await sleep(800);
+            stateBox.style.display = 'none';
+
+            // Display result
             textDiv.textContent = result.text || '(Nenhum texto detectado)';
 
-            // Exibir timing
             const timing = result.timing || {};
             timingDiv.innerHTML = `
                 <span>🎤 Gravação: ${timing.record_seconds || 0}s</span>
@@ -1966,10 +1994,12 @@ async function testWhisperTranscription() {
                 <span>📡 Provider: ${result.provider || 'local'}</span>
             `;
 
+            resultDiv.querySelector('h4').textContent = '✅ Resultado:';
             resultDiv.style.display = 'block';
             showToast('Transcrição concluída!', 'success');
         } else {
-            // Exibir erro
+            // Error state
+            stateBox.style.display = 'none';
             textDiv.textContent = result.error || 'Erro desconhecido';
             timingDiv.innerHTML = '';
             resultDiv.classList.add('error');
@@ -1978,6 +2008,7 @@ async function testWhisperTranscription() {
             showToast('Erro: ' + result.error, 'error');
         }
     } catch (error) {
+        stateBox.style.display = 'none';
         textDiv.textContent = 'Erro de rede: ' + error.message;
         timingDiv.innerHTML = '';
         resultDiv.classList.add('error');
@@ -1988,6 +2019,11 @@ async function testWhisperTranscription() {
         btn.disabled = false;
         btn.textContent = originalText;
     }
+}
+
+// Helper function for delays
+function sleep(ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 // ==========================================================================
