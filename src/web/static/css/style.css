@@ -233,10 +233,10 @@ input[type="checkbox"] {
     border: 1px solid var(--border);
     border-radius: 8px;
     padding: 24px;
-    margin: 16px 0;
+    margin: 16px auto;
+    /* Centered */
     box-shadow: var(--shadow);
     max-width: 1000px;
-    /* Limit stretching */
 }
 
 .status-card h3 {
@@ -282,10 +282,10 @@ input[type="checkbox"] {
     border: 1px solid var(--border);
     border-radius: 12px;
     padding: 24px;
-    margin: 20px 0;
+    margin: 20px auto;
+    /* Centered */
     box-shadow: var(--shadow);
     max-width: 1000px;
-    /* Limit stretching */
 }
 
 .config-section h3 {
@@ -299,7 +299,9 @@ input[type="checkbox"] {
     border: 1px solid var(--primary);
     border-radius: 8px;
     padding: 16px;
-    margin-bottom: 20px;
+    margin: 0 auto 20px auto;
+    /* Centered */
+    max-width: 1000px;
 }
 
 .info-box p {
@@ -548,7 +550,8 @@ input[type="checkbox"] {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
     gap: 20px;
-    margin-top: 16px;
+    margin: 16px auto 0 auto;
+    /* Centered */
     max-width: 1000px;
 }
 
@@ -657,6 +660,13 @@ input[type="checkbox"] {
 
     .form-group {
         max-width: 500px;
+        margin-left: auto;
+        margin-right: auto;
+    }
+
+    .tab-content h2 {
+        text-align: center;
+        margin-bottom: 24px;
     }
 }
 
@@ -785,11 +795,13 @@ input[type="checkbox"] {
     flex-direction: column;
     align-items: center;
     gap: 16px;
-    margin-bottom: 24px;
+    margin: 0 auto 24px auto;
+    /* Centered */
     padding: 24px;
     background: var(--bg-card);
     border-radius: 12px;
     box-shadow: var(--shadow);
+    max-width: 1000px;
 }
 
 .btn-record {

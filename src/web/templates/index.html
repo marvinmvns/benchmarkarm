@@ -945,11 +945,13 @@
             <input type="number" id="timeout" name="system.timeout" min="30" max="300" value="60">
         </div>
 
-        <div class="form-group">
-            <h3>Ações</h3>
-            <button type="button" id="btn-export" class="btn btn-secondary">📤 Exportar Config</button>
-            <button type="button" id="btn-import" class="btn btn-secondary">📥 Importar Config</button>
-            <button type="button" id="btn-reset" class="btn btn-danger">🔄 Resetar Padrões</button>
+        <div class="status-card">
+            <h3>Controles de Configuração</h3>
+            <div class="system-actions">
+                <button type="button" id="btn-export" class="btn btn-secondary">📤 Exportar Config</button>
+                <button type="button" id="btn-import" class="btn btn-secondary">📥 Importar Config</button>
+                <button type="button" id="btn-reset" class="btn btn-danger">🔄 Resetar Padrões</button>
+            </div>
         </div>
     </section>
 
@@ -986,28 +988,33 @@
             </div>
         </div>
 
-        <!-- Upload de Áudio -->
-        <div class="upload-section">
-            <h3>Ou envie um arquivo de áudio</h3>
-            <div class="upload-area">
-                <input type="file" id="audio-upload" accept="audio/*,.wav,.mp3,.ogg,.m4a" hidden>
-                <button type="button" id="btn-upload" class="btn btn-secondary">
-                    📤 Enviar Arquivo de Áudio
-                </button>
-                <span id="upload-filename"></span>
+        <!-- Upload & History -->
+        <div class="status-card">
+            <!-- Upload de Áudio -->
+            <div class="upload-section">
+                <h3>Ou envie um arquivo de áudio</h3>
+                <div class="upload-area">
+                    <input type="file" id="audio-upload" accept="audio/*,.wav,.mp3,.ogg,.m4a" hidden>
+                    <button type="button" id="btn-upload" class="btn btn-secondary">
+                        📤 Enviar Arquivo de Áudio
+                    </button>
+                    <span id="upload-filename"></span>
+                </div>
             </div>
-        </div>
 
-        <!-- Histórico -->
-        <div class="history-section">
-            <div class="history-header">
-                <h3>📜 Histórico</h3>
-                <button type="button" id="btn-clear-history" class="btn btn-secondary btn-small">
-                    🗑️ Limpar
-                </button>
-            </div>
-            <div id="transcription-history" class="transcription-history">
-                <p class="empty-history">Nenhuma transcrição ainda.</p>
+            <hr style="margin: 24px 0; border: 0; border-top: 1px dashed var(--border);">
+
+            <!-- Histórico -->
+            <div class="history-section">
+                <div class="history-header">
+                    <h3>📜 Histórico</h3>
+                    <button type="button" id="btn-clear-history" class="btn btn-secondary btn-small">
+                        🗑️ Limpar
+                    </button>
+                </div>
+                <div id="transcription-history" class="transcription-history">
+                    <p class="empty-history">Nenhuma transcrição ainda.</p>
+                </div>
             </div>
         </div>
 
