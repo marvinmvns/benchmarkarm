@@ -145,14 +145,23 @@ class ContinuousListener:
             logger.warning("Modo de escuta contínua não está ativo")
             return
         
-        self._init_components()
+        try:
+            logger.info("🚀 Inicializando componentes de áudio...")
+            self._init_components()
+            logger.info("✅ Componentes inicializados com sucesso")
+        except Exception as e:
+            logger.error(f"❌ Erro ao inicializar componentes: {e}")
+            import traceback
+            logger.error(traceback.format_exc())
+            return
+        
         self._running = True
         self._paused = False
         
         self._thread = threading.Thread(target=self._listen_loop, daemon=True)
         self._thread.start()
         
-        logger.info("🎧 Escuta contínua iniciada")
+        logger.info("🎧 Escuta contínua iniciada - Thread ativa")
 
     def stop(self) -> None:
         """Para a escuta contínua."""
