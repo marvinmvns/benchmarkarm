@@ -128,6 +128,12 @@ function populateForm(cfg) {
         $('#low_memory_mode').checked = cfg.system.low_memory_mode !== false;
         if (cfg.system.log_level) $('#log_level').value = cfg.system.log_level;
         if (cfg.system.timeout) $('#timeout').value = cfg.system.timeout;
+        // CPU Limiter
+        $('#cpu_limit_enabled').checked = cfg.system.cpu_limit_enabled !== false;
+        if (cfg.system.cpu_limit_percent) {
+            $('#cpu_limit_percent').value = cfg.system.cpu_limit_percent;
+            $('#cpu_limit_value').textContent = cfg.system.cpu_limit_percent;
+        }
     }
 
     // Audio
@@ -247,6 +253,9 @@ function collectFormValues() {
     config.system.low_memory_mode = $('#low_memory_mode').checked;
     config.system.log_level = $('#log_level').value;
     config.system.timeout = parseInt($('#timeout').value);
+    // CPU Limiter
+    config.system.cpu_limit_enabled = $('#cpu_limit_enabled').checked;
+    config.system.cpu_limit_percent = parseInt($('#cpu_limit_percent').value);
 
     // Audio
     if (!config.audio) config.audio = {};

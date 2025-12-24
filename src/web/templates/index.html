@@ -105,6 +105,22 @@
                         </label>
                         <small>Otimizações agressivas para Pi Zero 2W (512 MB RAM)</small>
                     </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="cpu_limit_enabled" name="system.cpu_limit_enabled" checked>
+                            ⚡ Limitador de CPU
+                        </label>
+                        <small>Pausa processamento quando CPU excede limite (evita congelamento)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="cpu_limit_percent">Limite de CPU (%)</label>
+                        <input type="range" id="cpu_limit_percent" name="system.cpu_limit_percent" min="50" max="95"
+                            value="85" oninput="$('#cpu_limit_value').textContent=this.value">
+                        <span id="cpu_limit_value">85</span>%
+                        <small>50-95%. Menor = mais lento, menos chance de travar</small>
+                    </div>
                 </div>
             </section>
 

@@ -16,6 +16,7 @@ import json
 import numpy as np
 
 from ..audio.capture import AudioBuffer
+from ..utils.cpu_limiter import get_cpu_limiter
 
 logger = logging.getLogger(__name__)
 
@@ -324,8 +325,15 @@ class WhisperTranscriber:
 
             logger.info(f"🎙️ Transcrevendo com whisper.cpp: modelo={self.model}, arquivo={Path(audio_path).name}")
 
+            # Esperar se CPU estiver sobrecarregada (evita congelamento)
+            cpu_limiter = get_cpu_limiter()
+            cpu_limiter.wait_if_overloaded(timeout=120)
+
+            # Usar nice/ionice para reduzir prioridade
+            nice_cmd = ["nice", "-n", "15", "ionice", "-c", "3"] + cmd
+
             result = subprocess.run(
-                cmd,
+                nice_cmd,
                 capture_output=True,
                 text=True,
                 timeout=600,  # 10 minutos - permite usar swap no Pi Zero

@@ -149,6 +149,10 @@ class SystemConfig:
     low_memory_mode: bool = True
     memory_logs_enabled: bool = True   # Logs em memória (desativar economiza RAM)
     timeout: int = 60
+    # CPU Limiter - evita congelamento do Pi
+    cpu_limit_enabled: bool = True      # Habilitar limitador de CPU
+    cpu_limit_percent: int = 85         # Percentual máximo de CPU (70-95)
+    cpu_check_interval: float = 1.0     # Intervalo de verificação em segundos
 
 
 @dataclass
