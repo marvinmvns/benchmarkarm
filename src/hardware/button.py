@@ -56,11 +56,33 @@ class ButtonController:
                 
                 if "Failed to add edge detection" in str(e):
                     logger.warning("Tentando método alternativo (Polling)...")
-                    # Implementar fallback se necessário, mas por enquanto desabilita
-                    # self._start_polling() 
-                
-                self.enabled = False
-    
+                    self._start_polling()
+                else:
+                    self.enabled = False
+
+    def _start_polling(self):
+        """Inicia polling em thread se interrupção falhar."""
+        import threading
+        print("🔘 Botão: Iniciando polling fallback...")
+        def poll():
+            last_state = GPIO.HIGH
+            while self.enabled:
+                try:
+                    current_state = GPIO.input(self.BUTTON_PIN)
+                    if last_state == GPIO.HIGH and current_state == GPIO.LOW:
+                         # Falling edge
+                         print("🔘 Botão detectado via polling!")
+                         self._on_press(self.BUTTON_PIN)
+                    last_state = current_state
+                    time.sleep(0.1) # 100ms polling
+                except Exception as e:
+                    logger.error(f"Erro no polling: {e}")
+                    time.sleep(1)
+        
+        t = threading.Thread(target=poll, daemon=True)
+        t.start()
+        logger.info("🔘 Botão: Polling iniciado (Fallback)")
+
     def _on_press(self, channel):
         """Callback interno do GPIO."""
         now = time.time()

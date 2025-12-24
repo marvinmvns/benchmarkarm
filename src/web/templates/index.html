@@ -446,8 +446,8 @@
         <!-- Whisper Models -->
         <div class="config-section">
             <h3>🎙️ Modelos Whisper (Transcrição)</h3>
-            <p class="section-description">Modelos para transcrição de áudio. Modelos menores são mais rápidos
-                mas menos precisos.</p>
+            <p class="section-description">Modelos para transcrição de áudio. Modelos menores são mais rápidos mas menos
+                precisos.</p>
 
             <div id="whisper-models" class="models-grid">
                 <div class="model-card" data-model="tiny">
@@ -487,19 +487,22 @@
                 </div>
             </div>
 
-            <div class="form-group" style="margin-top: 20px; border-top: 1px dashed #444; padding-top: 15px;">
+            <hr style="margin: 24px 0; border: 0; border-top: 1px dashed var(--border);">
+
+            <!-- Live Pipeline Test -->
+            <div id="live-test-block">
                 <h3>Teste de Pipeline (Ao Vivo)</h3>
-                <p class="force-small">Grava 5s do microfone e transcreve com o modelo selecionado.</p>
-                <div style="display: flex; gap: 10px; align-items: center; margin-bottom: 10px;">
-                    <label style="font-weight: normal; font-size: 0.9em; cursor: pointer;">
+                <p class="section-description">Grava 5s do microfone e transcreve com o modelo selecionado.</p>
+                <div class="form-group" style="margin-bottom: 15px;">
+                    <label style="font-weight: normal; cursor: pointer;">
                         <input type="checkbox" id="test-include-llm"> Incluir Resumo (LLM)
                     </label>
                 </div>
-                <button type="button" class="btn btn-warning" onclick="testLivePipeline()" id="btn-test-live">
+                <button type="button" id="btn-test-live" class="btn btn-primary" onclick="testLivePipeline()">
                     🎙️ Gravar e Testar (5s)
                 </button>
                 <div id="live-test-result"
-                    style="margin-top: 10px; font-family: monospace; font-size: 0.9em; display: none; padding: 10px; background: #222; border-radius: 4px;">
+                    style="margin-top: 15px; font-family: monospace; font-size: 0.9em; display: none; padding: 15px; background: #222; color: #eee; border-radius: 8px;">
                 </div>
             </div>
         </div>
@@ -507,8 +510,7 @@
         <!-- LLM Models -->
         <div class="config-section">
             <h3>🤖 Modelos LLM (Resumo/Chat)</h3>
-            <p class="section-description">Modelos de linguagem para gerar resumos. Precisam de mais RAM/swap.
-            </p>
+            <p class="section-description">Modelos de linguagem para gerar resumos. Precisam de mais RAM/swap.</p>
 
             <div id="llm-models" class="models-grid">
                 <div class="model-card" data-model="tinyllama">
@@ -559,7 +561,7 @@
         </div>
 
         <!-- Refresh Button -->
-        <div style="margin-top: 16px;">
+        <div style="margin-top: 20px;">
             <button class="btn btn-secondary" onclick="refreshModelStatus()">🔄 Atualizar Status</button>
         </div>
     </section>
@@ -568,37 +570,40 @@
     <section id="tab-offline" class="tab-content">
         <h2>Fila Offline</h2>
 
-        <div class="form-group">
-            <label>
-                <input type="checkbox" id="offline_enabled" name="offline_queue.enabled" checked>
-                Habilitar Fila Offline
-            </label>
-            <small>Armazena tarefas quando sem internet</small>
-        </div>
+        <div class="status-card">
+            <h3>Configurações da Fila</h3>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="offline_enabled" name="offline_queue.enabled" checked>
+                    Habilitar Fila Offline
+                </label>
+                <small>Armazena tarefas quando sem internet</small>
+            </div>
 
-        <div class="form-group">
-            <label for="max_queue_size">Tamanho Máximo da Fila</label>
-            <input type="number" id="max_queue_size" name="offline_queue.max_queue_size" min="100" max="10000"
-                value="1000">
-        </div>
+            <div class="form-group">
+                <label for="max_queue_size">Tamanho Máximo da Fila</label>
+                <input type="number" id="max_queue_size" name="offline_queue.max_queue_size" min="100" max="10000"
+                    value="1000">
+            </div>
 
-        <div class="form-group">
-            <label for="retry_delay">Delay Base para Retry (s)</label>
-            <input type="number" id="retry_delay" name="offline_queue.retry_delay_base" min="10" max="300" value="30">
-        </div>
+            <div class="form-group">
+                <label for="retry_delay">Delay Base para Retry (s)</label>
+                <input type="number" id="retry_delay" name="offline_queue.retry_delay_base" min="10" max="300"
+                    value="30">
+            </div>
 
-        <div class="form-group">
-            <label for="max_retries">Máximo de Retries</label>
-            <input type="number" id="max_retries" name="offline_queue.max_retries" min="1" max="10" value="3">
-        </div>
+            <div class="form-group">
+                <label for="max_retries">Máximo de Retries</label>
+                <input type="number" id="max_retries" name="offline_queue.max_retries" min="1" max="10" value="3">
+            </div>
 
-        <div class="form-group">
-            <label>
-                <input type="checkbox" id="use_local_fallback" name="offline_queue.use_local_fallback" checked>
-                Usar LLM Local como Fallback
-            </label>
+            <div class="form-group">
+                <label>
+                    <input type="checkbox" id="use_local_fallback" name="offline_queue.use_local_fallback" checked>
+                    Usar LLM Local como Fallback
+                </label>
+            </div>
         </div>
-
         <div class="status-card">
             <h3>Status da Fila</h3>
             <div id="queue-stats">
@@ -680,7 +685,7 @@
         </div>
 
         <!-- Modo 1: ReSpeaker (Microfone Local) -->
-        <div class="config-section">
+        <div class="status-card">
             <h3>🎙️ Modo 1: ReSpeaker HAT (Microfone Local)</h3>
 
             <div class="form-group">
@@ -718,7 +723,7 @@
         </div>
 
         <!-- Modo 2: USB Gadget -->
-        <div class="config-section">
+        <div class="status-card">
             <h3>🔌 Modo 2: USB Gadget (Áudio via USB)</h3>
 
             <div class="form-group">
@@ -1050,23 +1055,28 @@
             <p>3. Após sucesso, o arquivo <code>.wav</code> é removido para economizar espaço</p>
         </div>
 
-        <!-- Search -->
-        <div class="files-search">
-            <input type="text" id="files-search-input" placeholder="🔍 Buscar nas transcrições...">
-            <button type="button" id="btn-files-search" class="btn btn-secondary">Buscar</button>
-            <button type="button" id="btn-files-refresh" class="btn btn-secondary">🔄 Atualizar Lista</button>
-            <button type="button" id="btn-delete-all-txt" class="btn btn-danger" onclick="deleteAllTranscriptions()">🗑️
-                Apagar Todos TXT</button>
-        </div>
+        <!-- Search & Files -->
+        <div class="status-card">
+            <h3>📑 Gerenciador de Arquivos</h3>
 
-        <!-- Files List -->
-        <div class="files-list-container">
-            <h3>📄 Transcrições Salvas</h3>
-            <div id="files-list" class="files-list">
-                <p class="empty-message">Carregando...</p>
+            <div class="files-search">
+                <input type="text" id="files-search-input" placeholder="🔍 Buscar nas transcrições...">
+                <button type="button" id="btn-files-search" class="btn btn-secondary">Buscar</button>
+                <button type="button" id="btn-files-refresh" class="btn btn-secondary">🔄 Atualizar Lista</button>
+                <button type="button" id="btn-delete-all-txt" class="btn btn-danger"
+                    onclick="deleteAllTranscriptions()">
+                    🗑️ Apagar Todos TXT
+                </button>
             </div>
-            <div class="files-footer">
-                <span id="files-count">0 arquivos</span>
+
+            <div class="files-list-container">
+                <h3>📄 Transcrições Salvas</h3>
+                <div id="files-list" class="files-list">
+                    <p class="empty-message">Carregando...</p>
+                </div>
+                <div class="files-footer">
+                    <span id="files-count">0 arquivos</span>
+                </div>
             </div>
         </div>
 
@@ -1118,36 +1128,34 @@
             </div>
         </div>
 
-        <!-- Controls -->
-        <div class="logs-controls">
-            <div class="logs-filters">
-                <select id="logs-level-filter">
-                    <option value="">Todos os níveis</option>
-                    <option value="DEBUG">DEBUG</option>
-                    <option value="INFO">INFO</option>
-                    <option value="WARNING">WARNING</option>
-                    <option value="ERROR">ERROR</option>
-                    <option value="CRITICAL">CRITICAL</option>
-                </select>
-                <input type="number" id="logs-limit" value="100" min="10" max="500" placeholder="Limite">
-            </div>
-            <div class="logs-actions">
-                <button class="btn btn-small" id="btn-refresh-logs">🔄 Atualizar</button>
-                <button class="btn btn-small" id="btn-errors-only">❌ Só Erros</button>
-                <button class="btn btn-small btn-danger" id="btn-clear-logs">🗑️ Limpar</button>
-            </div>
-        </div>
+        <div class="status-card">
+            <h3>📑 Logs do Sistema</h3>
 
-        <!-- Info Box -->
-        <div class="info-box">
-            <p>💡 Os logs são armazenados em memória (últimos 500 registros). Use os filtros para encontrar
-                erros ou informações específicas.</p>
-        </div>
+            <!-- Controls -->
+            <div class="logs-controls">
+                <div class="logs-filters">
+                    <select id="logs-level-filter">
+                        <option value="">Todos os níveis</option>
+                        <option value="DEBUG">DEBUG</option>
+                        <option value="INFO">INFO</option>
+                        <option value="WARNING">WARNING</option>
+                        <option value="ERROR">ERROR</option>
+                        <option value="CRITICAL">CRITICAL</option>
+                    </select>
+                    <input type="number" id="logs-limit" value="100" min="10" max="500" placeholder="Limite">
+                </div>
+                <div class="logs-actions">
+                    <button class="btn btn-small" id="btn-refresh-logs">🔄 Atualizar</button>
+                    <button class="btn btn-small" id="btn-errors-only">❌ Só Erros</button>
+                    <button class="btn btn-small btn-danger" id="btn-clear-logs">🗑️ Limpar</button>
+                </div>
+            </div>
 
-        <!-- Logs List -->
-        <div class="logs-container">
-            <div id="logs-list" class="logs-list">
-                <p class="empty-message">Carregando logs...</p>
+            <!-- Logs List -->
+            <div class="logs-container">
+                <div id="logs-list" class="logs-list">
+                    <p class="empty-message">Carregando logs...</p>
+                </div>
             </div>
         </div>
 
