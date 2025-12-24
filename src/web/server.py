@@ -1791,6 +1791,13 @@ def run_standalone(config_path: Optional[str] = None, host: str = "0.0.0.0", por
         print("Erro: Flask não instalado. Execute: pip install flask")
         return
 
+        return
+        
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    )
+
     app = create_app(config_path)
     print(f"Iniciando interface web em http://{host}:{port}")
     print("Pressione Ctrl+C para parar")
