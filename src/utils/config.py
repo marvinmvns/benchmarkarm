@@ -229,6 +229,7 @@ class Config:
         openai_data = llm_data.get("openai", {})
         anthropic_data = llm_data.get("anthropic", {})
         ollama_data = llm_data.get("ollama", {})
+        chatmock_data = llm_data.get("chatmock", {})
 
         llm = LLMConfig(
             provider=llm_data.get("provider", "local"),
@@ -236,6 +237,7 @@ class Config:
             openai=OpenAIConfig(**{k: v for k, v in openai_data.items() if k in OpenAIConfig.__dataclass_fields__}),
             anthropic=AnthropicConfig(**{k: v for k, v in anthropic_data.items() if k in AnthropicConfig.__dataclass_fields__}),
             ollama=OllamaConfig(**{k: v for k, v in ollama_data.items() if k in OllamaConfig.__dataclass_fields__}),
+            chatmock=ChatMockConfig(**{k: v for k, v in chatmock_data.items() if k in ChatMockConfig.__dataclass_fields__}),
         )
 
         prompts_data = data.get("prompts", {})

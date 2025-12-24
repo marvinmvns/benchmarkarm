@@ -273,11 +273,26 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             if not new_config:
                 return jsonify({"error": "Configuração vazia"}), 400
 
-            if save_config(new_config):
+            # Carregar config atual para fazer merge
+            current_config = load_config()
+            
+            # Recursive update helper
+            def deep_update(target, source):
+                for k, v in source.items():
+                    if isinstance(v, dict) and k in target and isinstance(target[k], dict):
+                        deep_update(target[k], v)
+                    else:
+                        target[k] = v
+                return target
+
+            updated_config = deep_update(current_config, new_config)
+
+            if save_config(updated_config):
                 return jsonify({"success": True, "message": "Configuração salva!"})
             else:
                 return jsonify({"error": "Erro ao salvar configuração"}), 500
         except Exception as e:
+            logger.error(f"Erro no update_config: {e}")
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/config/<section>", methods=["GET"])
