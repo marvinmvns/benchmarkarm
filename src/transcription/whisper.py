@@ -10,7 +10,7 @@ import tempfile
 import time
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Optional, Literal
+from typing import Optional, Literal, List
 import json
 
 import numpy as np
