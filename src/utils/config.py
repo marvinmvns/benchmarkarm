@@ -128,6 +128,7 @@ class SystemConfig:
     log_level: str = "INFO"
     log_file: str = ""
     low_memory_mode: bool = True
+    memory_logs_enabled: bool = True   # Logs em memória (desativar economiza RAM)
     timeout: int = 60
 
 

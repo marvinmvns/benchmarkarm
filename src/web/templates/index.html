@@ -51,20 +51,52 @@
                     <small>Local: tudo no dispositivo | API: usa serviços externos | Híbrido: melhor dos dois</small>
                 </div>
 
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="cache_enabled" name="system.cache_enabled">
-                        Habilitar Cache
-                    </label>
-                    <small>Reduz processamento redundante</small>
-                </div>
+                <!-- Feature Toggles Section -->
+                <div class="status-card">
+                    <h3>⚡ Feature Toggles (Economizar Recursos)</h3>
+                    <small style="color: var(--text-muted); margin-bottom: 12px; display: block;">
+                        Desative recursos para economizar memória no Raspberry Pi
+                    </small>
 
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="low_memory_mode" name="system.low_memory_mode">
-                        Modo Baixa Memória
-                    </label>
-                    <small>Otimiza para dispositivos com pouca RAM (Pi Zero 2W)</small>
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="cache_enabled" name="system.cache_enabled">
+                            💾 Cache de Transcrições
+                        </label>
+                        <small>Reduz processamento redundante (usa memória)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="memory_logs_enabled" name="system.memory_logs_enabled">
+                            📋 Logs em Memória
+                        </label>
+                        <small>Armazena logs para visualização (usa ~2 MB RAM)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="vad_enabled" name="audio.vad_enabled">
+                            🎙️ Detecção de Voz (VAD)
+                        </label>
+                        <small>Detecta automaticamente quando há fala</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="usb_auto_summarize" name="usb_receiver.auto_summarize">
+                            🤖 Resumo Automático (LLM)
+                        </label>
+                        <small>Gera resumos das transcrições (usa muita memória/CPU)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="low_memory_mode" name="system.low_memory_mode" checked>
+                            🔋 Modo Baixa Memória
+                        </label>
+                        <small>Otimizações agressivas para Pi Zero 2W (512 MB RAM)</small>
+                    </div>
                 </div>
             </section>
 

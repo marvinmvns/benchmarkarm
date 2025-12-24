@@ -1554,3 +1554,130 @@ input[type="checkbox"] {
         gap: 16px;
     }
 }
+
+/* ==========================================================================
+   Mobile Responsive Improvements
+   ========================================================================== */
+
+@media (max-width: 480px) {
+
+    /* Header */
+    .header {
+        flex-direction: column;
+        gap: 8px;
+        text-align: center;
+    }
+
+    .header h1 {
+        font-size: 1.1rem;
+    }
+
+    /* Navigation - horizontal scroll with smaller tabs */
+    .nav-tabs {
+        gap: 2px;
+        padding: 8px 12px;
+    }
+
+    .tab-btn {
+        padding: 6px 10px;
+        font-size: 0.75rem;
+    }
+
+    /* Form elements */
+    .form-group {
+        margin-bottom: 12px;
+    }
+
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+        font-size: 16px;
+        /* Prevents zoom on iOS */
+    }
+
+    /* Footer - stack buttons vertically */
+    .footer {
+        flex-direction: column;
+        gap: 8px;
+        padding: 12px 16px;
+    }
+
+    .footer .btn {
+        width: 100%;
+        justify-content: center;
+    }
+
+    /* Status cards */
+    .status-card {
+        padding: 12px;
+    }
+
+    .status-card h3 {
+        font-size: 0.9rem;
+    }
+
+    /* Buttons smaller on mobile */
+    .btn {
+        padding: 8px 12px;
+        font-size: 0.8rem;
+    }
+
+    .btn-small {
+        padding: 4px 8px;
+        font-size: 0.7rem;
+    }
+
+    /* Section titles */
+    .tab-content h2 {
+        font-size: 1rem;
+    }
+
+    /* Info boxes */
+    .info-box {
+        padding: 10px;
+        font-size: 0.85rem;
+    }
+
+    /* Files list */
+    .file-item {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .file-actions {
+        width: 100%;
+        margin-top: 8px;
+    }
+
+    /* Batch controls */
+    .batch-controls {
+        flex-direction: column;
+        gap: 8px;
+    }
+
+    .batch-controls .btn {
+        width: 100%;
+    }
+
+    /* Logs */
+    .log-entry {
+        padding: 8px;
+        font-size: 0.75rem;
+    }
+
+    .log-header {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 4px;
+    }
+
+    /* Model cards */
+    .model-card {
+        padding: 10px;
+    }
+
+    /* Download progress */
+    .download-progress {
+        padding: 10px;
+    }
+}

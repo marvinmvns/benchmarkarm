@@ -23,7 +23,7 @@ class MemoryLogHandler(logging.Handler):
     _instance = None
     _lock = threading.Lock()
     
-    def __new__(cls, max_entries: int = 500):
+    def __new__(cls, max_entries: int = 200):  # Reduzido para economizar memória
         if cls._instance is None:
             with cls._lock:
                 if cls._instance is None:
@@ -31,7 +31,7 @@ class MemoryLogHandler(logging.Handler):
                     cls._instance._initialized = False
         return cls._instance
     
-    def __init__(self, max_entries: int = 500):
+    def __init__(self, max_entries: int = 200):  # Reduzido para economizar memória
         if self._initialized:
             return
         super().__init__()

@@ -124,6 +124,7 @@ function populateForm(cfg) {
     // System
     if (cfg.system) {
         $('#cache_enabled').checked = cfg.system.cache_enabled !== false;
+        $('#memory_logs_enabled').checked = cfg.system.memory_logs_enabled !== false;
         $('#low_memory_mode').checked = cfg.system.low_memory_mode !== false;
         if (cfg.system.log_level) $('#log_level').value = cfg.system.log_level;
         if (cfg.system.timeout) $('#timeout').value = cfg.system.timeout;
@@ -216,6 +217,7 @@ function collectFormValues() {
     // System
     if (!config.system) config.system = {};
     config.system.cache_enabled = $('#cache_enabled').checked;
+    config.system.memory_logs_enabled = $('#memory_logs_enabled').checked;
     config.system.low_memory_mode = $('#low_memory_mode').checked;
     config.system.log_level = $('#log_level').value;
     config.system.timeout = parseInt($('#timeout').value);
