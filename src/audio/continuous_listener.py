@@ -10,6 +10,7 @@ import os
 import signal
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -297,6 +298,25 @@ class ContinuousListener:
         
         # Armazenar e notificar
         self._segments.append(segment)
+        
+        # Salvar no banco de dados persistente
+        try:
+            from ..utils.transcription_store import get_transcription_store, TranscriptionRecord
+            store = get_transcription_store()
+            record = TranscriptionRecord(
+                id=str(uuid.uuid4()),
+                timestamp=timestamp,
+                duration_seconds=audio.duration,
+                text=text,
+                summary=summary,
+                audio_file=audio_file,
+                language=self.config.whisper.language or "pt",
+                processed_by=self.config.whisper.provider or "local",
+            )
+            store.save(record)
+            logger.debug(f"Transcrição salva no banco: {record.id}")
+        except Exception as e:
+            logger.warning(f"Erro ao salvar transcrição no banco: {e}")
         
         # Limitar histórico em memória
         if len(self._segments) > 100:

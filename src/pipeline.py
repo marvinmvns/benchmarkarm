@@ -236,8 +236,50 @@ class VoiceProcessor:
                 logger.debug("Transcrição obtida do cache")
                 return TranscriptionResult(**cached)
 
-        # Transcrever
-        result = self.transcriber.transcribe(audio, language)
+        # Transcrever com fallback para local se API falhar
+        result = None
+        used_fallback = False
+        
+        try:
+            result = self.transcriber.transcribe(audio, language)
+        except Exception as e:
+            error_str = str(e).lower()
+            
+            # Erros de conexão que justificam fallback para local
+            is_connection_error = any(x in error_str for x in [
+                'connection refused', 'connection error', 'timeout',
+                'errno 111', 'unreachable', 'network', 'refused',
+            ])
+            
+            if is_connection_error and self.config.whisper.provider != "local":
+                logger.warning(f"⚠️ WhisperAPI falhou ({e}), tentando fallback para local...")
+                
+                try:
+                    # Criar transcriber local temporário
+                    local_transcriber = get_transcriber(
+                        provider="local",
+                        model="tiny",  # Modelo mais leve para fallback rápido
+                        model_path=self.config.whisper.local.model_path,
+                        language=language or self.config.whisper.language,
+                    )
+                    
+                    result = local_transcriber.transcribe(audio, language)
+                    used_fallback = True
+                    logger.info("✅ Fallback para Whisper local bem sucedido!")
+                    
+                except Exception as fallback_error:
+                    logger.error(f"❌ Fallback para local também falhou: {fallback_error}")
+                    raise RuntimeError(f"Transcrição falhou (API e local): {e} / {fallback_error}")
+            else:
+                # Erro não é de conexão ou já é local, re-raise
+                raise
+        
+        if result is None:
+            raise RuntimeError("Transcrição retornou resultado nulo")
+        
+        # Marcar se usou fallback
+        if used_fallback:
+            result.model = f"{result.model} (fallback)"
 
         # Salvar no cache
         if self.cache:

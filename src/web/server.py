@@ -792,6 +792,215 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             return jsonify({"error": str(e)}), 500
 
     # ==========================================================================
+    # Gerenciamento de Transcrições (Histórico Persistente)
+    # ==========================================================================
+    
+    def get_transcription_store():
+        """Obtém instância do TranscriptionStore."""
+        try:
+            from ..utils.transcription_store import get_transcription_store as get_store
+            return get_store()
+        except Exception as e:
+            logger.error(f"Erro ao obter TranscriptionStore: {e}")
+            return None
+    
+    @app.route("/api/transcriptions", methods=["GET"])
+    def list_transcriptions():
+        """Lista transcrições com paginação e filtros."""
+        try:
+            store = get_transcription_store()
+            if not store:
+                return jsonify({"success": False, "error": "Store não disponível"}), 500
+            
+            limit = request.args.get("limit", 50, type=int)
+            offset = request.args.get("offset", 0, type=int)
+            date_from = request.args.get("date_from")
+            date_to = request.args.get("date_to")
+            
+            from datetime import date as date_type
+            date_from_parsed = date_type.fromisoformat(date_from) if date_from else None
+            date_to_parsed = date_type.fromisoformat(date_to) if date_to else None
+            
+            records = store.list(
+                limit=limit, 
+                offset=offset,
+                date_from=date_from_parsed,
+                date_to=date_to_parsed,
+            )
+            total = store.count(date_from=date_from_parsed, date_to=date_to_parsed)
+            
+            return jsonify({
+                "success": True,
+                "transcriptions": [r.to_dict() for r in records],
+                "total": total,
+                "limit": limit,
+                "offset": offset,
+            })
+        except Exception as e:
+            logger.error(f"Erro ao listar transcrições: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+    
+    @app.route("/api/transcriptions/<id>", methods=["GET"])
+    def get_transcription(id):
+        """Obtém transcrição por ID."""
+        try:
+            store = get_transcription_store()
+            if not store:
+                return jsonify({"success": False, "error": "Store não disponível"}), 500
+            
+            record = store.get(id)
+            if record:
+                return jsonify({"success": True, "transcription": record.to_dict()})
+            else:
+                return jsonify({"success": False, "error": "Transcrição não encontrada"}), 404
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+    
+    @app.route("/api/transcriptions/daily/<date_str>", methods=["GET"])
+    def get_daily_transcriptions(date_str):
+        """Obtém transcrições consolidadas de um dia."""
+        try:
+            store = get_transcription_store()
+            if not store:
+                return jsonify({"success": False, "error": "Store não disponível"}), 500
+            
+            from datetime import date as date_type
+            target_date = date_type.fromisoformat(date_str)
+            
+            # Tentar obter consolidação existente
+            consolidated = store.get_daily_consolidated(target_date)
+            
+            if consolidated:
+                return jsonify({"success": True, **consolidated})
+            else:
+                # Retornar lista do dia se não houver consolidação
+                records = store.get_by_date(target_date)
+                return jsonify({
+                    "success": True,
+                    "date": date_str,
+                    "total_transcriptions": len(records),
+                    "transcriptions": [r.to_dict() for r in records],
+                })
+        except ValueError:
+            return jsonify({"success": False, "error": "Data inválida. Use formato YYYY-MM-DD"}), 400
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+    
+    @app.route("/api/transcriptions/search", methods=["POST"])
+    def search_transcriptions():
+        """Busca transcrições por texto."""
+        try:
+            store = get_transcription_store()
+            if not store:
+                return jsonify({"success": False, "error": "Store não disponível"}), 500
+            
+            data = request.get_json() or {}
+            query = data.get("query", "")
+            limit = data.get("limit", 50)
+            
+            if not query:
+                return jsonify({"success": False, "error": "Query é obrigatória"}), 400
+            
+            records = store.search(query, limit=limit)
+            
+            return jsonify({
+                "success": True,
+                "query": query,
+                "results": [r.to_dict() for r in records],
+                "total": len(records),
+            })
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+    
+    @app.route("/api/transcriptions/<id>/llm", methods=["POST"])
+    def process_transcription_llm(id):
+        """Processa transcrição com LLM usando prompt customizado."""
+        try:
+            store = get_transcription_store()
+            if not store:
+                return jsonify({"success": False, "error": "Store não disponível"}), 500
+            
+            record = store.get(id)
+            if not record:
+                return jsonify({"success": False, "error": "Transcrição não encontrada"}), 404
+            
+            data = request.get_json() or {}
+            custom_prompt = data.get("prompt", "Resuma o seguinte texto de forma concisa:")
+            
+            # Montar prompt completo
+            full_prompt = f"{custom_prompt}\n\n{record.text}"
+            
+            # Processar com LLM
+            try:
+                from ..llm.api import get_llm_client
+                llm_config = config.llm
+                client = get_llm_client(llm_config)
+                result = client.generate(full_prompt)
+                
+                # Salvar resultado
+                store.update_llm_result(id, result)
+                
+                return jsonify({
+                    "success": True,
+                    "transcription_id": id,
+                    "prompt": custom_prompt,
+                    "result": result,
+                })
+            except Exception as llm_error:
+                return jsonify({
+                    "success": False, 
+                    "error": f"Erro no LLM: {llm_error}",
+                }), 500
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+    
+    @app.route("/api/transcriptions/<id>", methods=["DELETE"])
+    def delete_transcription(id):
+        """Remove transcrição por ID."""
+        try:
+            store = get_transcription_store()
+            if not store:
+                return jsonify({"success": False, "error": "Store não disponível"}), 500
+            
+            deleted = store.delete(id)
+            if deleted:
+                return jsonify({"success": True, "message": f"Transcrição {id} removida"})
+            else:
+                return jsonify({"success": False, "error": "Transcrição não encontrada"}), 404
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+    
+    @app.route("/api/transcriptions/consolidate", methods=["POST"])
+    def consolidate_transcriptions():
+        """Consolida transcrições de um dia em arquivo JSON."""
+        try:
+            store = get_transcription_store()
+            if not store:
+                return jsonify({"success": False, "error": "Store não disponível"}), 500
+            
+            data = request.get_json() or {}
+            date_str = data.get("date")
+            
+            from datetime import date as date_type
+            target_date = date_type.fromisoformat(date_str) if date_str else None
+            
+            filepath = store.consolidate_daily(target_date)
+            
+            if filepath:
+                return jsonify({
+                    "success": True,
+                    "message": "Consolidação concluída",
+                    "filepath": filepath,
+                })
+            else:
+                return jsonify({
+                    "success": True,
+                    "message": "Nenhuma transcrição para consolidar",
+                })
+        except Exception as e:
+            return jsonify({"success": False, "error": str(e)}), 500
+
+    # ==========================================================================
     # Gerenciamento de Modelos
     # ==========================================================================
     
