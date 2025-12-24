@@ -150,16 +150,78 @@
             <section id="tab-whisper" class="tab-content">
                 <h2>Configurações do Whisper</h2>
 
+                <!-- Provider Selection -->
                 <div class="form-group">
-                    <label for="whisper_model">Modelo</label>
-                    <select id="whisper_model" name="whisper.model">
-                        <option value="tiny">Tiny (75MB) - Mais rápido</option>
-                        <option value="base">Base (142MB) - Equilibrado</option>
-                        <option value="small">Small (466MB) - Mais preciso</option>
+                    <label for="whisper_provider">Provedor</label>
+                    <select id="whisper_provider" name="whisper.provider">
+                        <option value="local">🖥️ Local (whisper.cpp)</option>
+                        <option value="openai">☁️ OpenAI API</option>
                     </select>
-                    <small>Para Pi Zero 2W, use Tiny ou Base</small>
+                    <small>Local: processa no dispositivo | OpenAI: mais rápido, precisa internet</small>
                 </div>
 
+                <!-- Local Whisper Config -->
+                <div id="whisper-local-config" class="config-section">
+                    <h3>Configuração Local</h3>
+
+                    <div class="form-group">
+                        <label for="whisper_model">Modelo</label>
+                        <select id="whisper_model" name="whisper.model">
+                            <option value="tiny">Tiny (75MB) - Mais rápido</option>
+                            <option value="base">Base (142MB) - Equilibrado</option>
+                            <option value="small">Small (466MB) - Mais preciso</option>
+                        </select>
+                        <small>Para Pi Zero 2W, use Tiny ou Base</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="whisper_use_cpp" name="whisper.use_cpp" checked>
+                            Usar whisper.cpp (Mais rápido)
+                        </label>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="whisper_threads">Threads</label>
+                        <input type="number" id="whisper_threads" name="whisper.threads" min="1" max="8" value="4">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="whisper_beam_size">Beam Size</label>
+                        <input type="number" id="whisper_beam_size" name="whisper.beam_size" min="1" max="5" value="1">
+                        <small>1 = mais rápido (greedy), maior = mais preciso</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="whisper_stream_mode" name="whisper.stream_mode">
+                            🔴 Modo Stream (Transcrição em tempo real)
+                        </label>
+                        <small>Transcreve enquanto o áudio é capturado. Usa mais CPU.</small>
+                    </div>
+                </div>
+
+                <!-- OpenAI Whisper Config -->
+                <div id="whisper-openai-config" class="config-section" style="display: none;">
+                    <h3>☁️ OpenAI Whisper API</h3>
+
+                    <div class="form-group">
+                        <label for="whisper_openai_api_key">API Key</label>
+                        <input type="password" id="whisper_openai_api_key" name="whisper.openai_api_key"
+                            placeholder="sk-..." autocomplete="off">
+                        <small>Obtenha em <a href="https://platform.openai.com/api-keys"
+                                target="_blank">platform.openai.com</a></small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="whisper_openai_model">Modelo API</label>
+                        <select id="whisper_openai_model" name="whisper.openai_model">
+                            <option value="whisper-1">whisper-1 (Padrão)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- Common Settings -->
                 <div class="form-group">
                     <label for="whisper_language">Idioma</label>
                     <select id="whisper_language" name="whisper.language">
@@ -168,32 +230,6 @@
                         <option value="es">Español</option>
                         <option value="">Auto-detectar</option>
                     </select>
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="whisper_use_cpp" name="whisper.use_cpp" checked>
-                        Usar whisper.cpp (Mais rápido)
-                    </label>
-                </div>
-
-                <div class="form-group">
-                    <label for="whisper_threads">Threads</label>
-                    <input type="number" id="whisper_threads" name="whisper.threads" min="1" max="8" value="4">
-                </div>
-
-                <div class="form-group">
-                    <label for="whisper_beam_size">Beam Size</label>
-                    <input type="number" id="whisper_beam_size" name="whisper.beam_size" min="1" max="5" value="1">
-                    <small>1 = mais rápido (greedy), maior = mais preciso</small>
-                </div>
-
-                <div class="form-group">
-                    <label>
-                        <input type="checkbox" id="whisper_stream_mode" name="whisper.stream_mode">
-                        🔴 Modo Stream (Transcrição em tempo real)
-                    </label>
-                    <small>Transcreve enquanto o áudio é capturado. Usa mais CPU.</small>
                 </div>
             </section>
 

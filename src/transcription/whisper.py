@@ -229,7 +229,19 @@ class WhisperTranscriber:
 
             # Transcrever
             if self.use_cpp and self._cpp_available:
-                result = self._transcribe_cpp(tmp_path, language)
+                try:
+                    result = self._transcribe_cpp(tmp_path, language)
+                except RuntimeError as e:
+                    # Se falhar com OOM (-9) ou outro erro, tentar Python
+                    error_msg = str(e)
+                    if "código -9" in error_msg or "código -11" in error_msg:
+                        logger.warning(
+                            f"⚠️ whisper.cpp falhou com OOM. "
+                            f"Tentando fallback para Whisper Python..."
+                        )
+                        result = self._transcribe_python(tmp_path, language)
+                    else:
+                        raise
             else:
                 result = self._transcribe_python(tmp_path, language)
 
@@ -316,7 +328,7 @@ class WhisperTranscriber:
                 cmd,
                 capture_output=True,
                 text=True,
-                timeout=120,  # 2 minutos timeout
+                timeout=600,  # 10 minutos - permite usar swap no Pi Zero
             )
 
             if result.returncode != 0:

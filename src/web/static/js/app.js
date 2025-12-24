@@ -145,12 +145,17 @@ function populateForm(cfg) {
 
     // Whisper
     if (cfg.whisper) {
+        $('#whisper_provider').value = cfg.whisper.provider || 'local';
+        updateWhisperSection(cfg.whisper.provider || 'local');
         $('#whisper_model').value = cfg.whisper.model || 'tiny';
         $('#whisper_language').value = cfg.whisper.language || 'pt';
         $('#whisper_use_cpp').checked = cfg.whisper.use_cpp !== false;
-        $('#whisper_threads').value = cfg.whisper.threads || 4;
+        $('#whisper_threads').value = cfg.whisper.threads || 2;  // Default 2 para Pi Zero
         $('#whisper_beam_size').value = cfg.whisper.beam_size || 1;
         $('#whisper_stream_mode').checked = cfg.whisper.stream_mode === true;
+        if (cfg.whisper.openai_api_key) {
+            $('#whisper_openai_api_key').value = cfg.whisper.openai_api_key;
+        }
     }
 
     // LLM
@@ -234,12 +239,14 @@ function collectFormValues() {
 
     // Whisper
     if (!config.whisper) config.whisper = {};
+    config.whisper.provider = $('#whisper_provider').value;
     config.whisper.model = $('#whisper_model').value;
     config.whisper.language = $('#whisper_language').value;
     config.whisper.use_cpp = $('#whisper_use_cpp').checked;
     config.whisper.threads = parseInt($('#whisper_threads').value);
     config.whisper.beam_size = parseInt($('#whisper_beam_size').value);
     config.whisper.stream_mode = $('#whisper_stream_mode').checked;
+    config.whisper.openai_api_key = $('#whisper_openai_api_key').value;
 
     // LLM
     if (!config.llm) config.llm = {};
@@ -312,6 +319,21 @@ function updateLLMSection(provider) {
     } else {
         localConfig.style.display = 'none';
         apiConfig.style.display = 'block';
+    }
+}
+
+function updateWhisperSection(provider) {
+    const localConfig = $('#whisper-local-config');
+    const openaiConfig = $('#whisper-openai-config');
+
+    if (localConfig && openaiConfig) {
+        if (provider === 'local') {
+            localConfig.style.display = 'block';
+            openaiConfig.style.display = 'none';
+        } else {
+            localConfig.style.display = 'none';
+            openaiConfig.style.display = 'block';
+        }
     }
 }
 
@@ -431,6 +453,11 @@ function initEventListeners() {
     // LLM provider change
     $('#llm_provider').addEventListener('change', (e) => {
         updateLLMSection(e.target.value);
+    });
+
+    // Whisper provider change
+    $('#whisper_provider').addEventListener('change', (e) => {
+        updateWhisperSection(e.target.value);
     });
 
     // Range sliders
