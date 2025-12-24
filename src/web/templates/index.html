@@ -41,15 +41,8 @@
             <section id="tab-general" class="tab-content active">
                 <h2>Configurações Gerais</h2>
 
-                <div class="form-group">
-                    <label for="mode">Modo de Operação</label>
-                    <select id="mode" name="mode">
-                        <option value="local">Local (Offline)</option>
-                        <option value="api">API (Online)</option>
-                        <option value="hybrid">Híbrido (Recomendado)</option>
-                    </select>
-                    <small>Local: tudo no dispositivo | API: usa serviços externos | Híbrido: melhor dos dois</small>
-                </div>
+                <!-- Sistema usa as configurações de Whisper/LLM diretamente.
+                     Fallback automático para local quando offline. -->
 
                 <!-- Feature Toggles Section -->
                 <div class="status-card">
@@ -1014,14 +1007,22 @@
             </div>
         </div>
 
-        <!-- Status do Processador -->
+        <!-- Configuração Ativa -->
         <div class="status-card">
-            <h3>Status do Processador</h3>
-            <div id="processor-status">
-                <p>Modo: <span id="proc-mode">-</span></p>
-                <p>Modelo Whisper: <span id="proc-whisper">-</span></p>
-                <p>LLM: <span id="proc-llm">-</span></p>
-                <p>Total Transcrições: <span id="proc-total">0</span></p>
+            <h3>⚙️ Configuração Ativa</h3>
+            <p class="info-box">Estas são as configurações salvas que serão usadas na transcrição.</p>
+            <div id="config-status">
+                <p>Modo: <span id="cfg-mode" class="badge">-</span></p>
+                <p>Whisper: <span id="cfg-whisper-provider" class="badge">-</span> → Modelo: <span
+                        id="cfg-whisper-model" class="badge">-</span></p>
+                <p>LLM: <span id="cfg-llm-provider" class="badge">-</span> → Modelo: <span id="cfg-llm-model"
+                        class="badge">-</span></p>
+                <p>Idioma: <span id="cfg-language" class="badge">-</span></p>
+            </div>
+            <div style="margin-top: 16px; display: flex; gap: 12px; flex-wrap: wrap;">
+                <button type="button" class="btn btn-secondary btn-small" onclick="loadConfig()">🔄 Atualizar</button>
+                <a href="#" onclick="switchToTab('general'); return false;" class="btn btn-small">⚙️ Editar
+                    Configurações</a>
             </div>
         </div>
     </section>

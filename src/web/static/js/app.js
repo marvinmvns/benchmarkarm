@@ -88,6 +88,7 @@ async function loadConfig() {
     try {
         config = await apiGet('config');
         populateForm(config);
+        updateConfigStatus(config);
         updateStatus('online');
         showToast('Configuração carregada', 'success');
     } catch (error) {
@@ -242,9 +243,55 @@ function populateForm(cfg) {
     }
 }
 
+// Update config status display in Transcription tab
+function updateConfigStatus(cfg) {
+    // Whisper provider/model
+    const whisperProvider = cfg.whisper?.provider || 'local';
+    const cfgWhisperProvider = $('#cfg-whisper-provider');
+    const cfgWhisperModel = $('#cfg-whisper-model');
+    if (cfgWhisperProvider) cfgWhisperProvider.textContent = whisperProvider;
+    if (cfgWhisperModel) {
+        if (whisperProvider === 'local') {
+            cfgWhisperModel.textContent = cfg.whisper?.model || 'tiny';
+        } else if (whisperProvider === 'whisperapi') {
+            cfgWhisperModel.textContent = 'servidor externo';
+        } else if (whisperProvider === 'openai') {
+            cfgWhisperModel.textContent = cfg.whisper?.openai_model || 'whisper-1';
+        } else {
+            cfgWhisperModel.textContent = '-';
+        }
+    }
+
+    // LLM provider/model
+    const llmProvider = cfg.llm?.provider || 'local';
+    const cfgLLMProvider = $('#cfg-llm-provider');
+    const cfgLLMModel = $('#cfg-llm-model');
+    if (cfgLLMProvider) cfgLLMProvider.textContent = llmProvider;
+    if (cfgLLMModel) {
+        if (llmProvider === 'local') {
+            cfgLLMModel.textContent = cfg.llm?.local?.model || 'tinyllama';
+        } else if (llmProvider === 'chatmock') {
+            cfgLLMModel.textContent = cfg.llm?.chatmock?.model || 'gpt-5';
+        } else if (llmProvider === 'openai') {
+            cfgLLMModel.textContent = cfg.llm?.openai?.model || 'gpt-4o-mini';
+        } else if (llmProvider === 'ollama') {
+            cfgLLMModel.textContent = cfg.llm?.ollama?.model || 'ollama';
+        } else {
+            cfgLLMModel.textContent = '-';
+        }
+    }
+
+    // Language
+    const cfgLanguage = $('#cfg-language');
+    if (cfgLanguage) cfgLanguage.textContent = cfg.whisper?.language || 'pt';
+
+    // Remove mode display since we removed operation mode
+    const cfgMode = $('#cfg-mode');
+    if (cfgMode) cfgMode.textContent = whisperProvider === 'local' ? 'local' : 'api';
+}
+
 function collectFormValues() {
-    // Mode
-    config.mode = $('#mode').value;
+    // System uses configured providers directly (no mode selection)
 
     // System
     if (!config.system) config.system = {};
