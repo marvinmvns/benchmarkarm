@@ -268,47 +268,56 @@ class BatchProcessor:
         logger.info(f"📝 Processando: {wav_path.name}")
         self._stats.current_file = wav_path.name
         
+        retries = 3
+        delay = 1.0
+        
         try:
-            # Transcrever
-            transcriber = self._get_transcriber()
-            result = transcriber.transcribe(str(wav_path))
-            
-            # Criar conteúdo do .txt com metadados
-            txt_content = self._format_transcription(
-                wav_name=wav_path.name,
-                text=result.text,
-                duration=result.duration,
-                model=result.model,
-                language=result.language,
-                processing_time=result.processing_time,
-            )
-            
-            # Salvar .txt
-            txt_path = wav_path.with_suffix(".txt")
-            txt_path.write_text(txt_content, encoding="utf-8")
-            logger.info(f"✅ Salvo: {txt_path.name}")
-            
-            # Remover .wav
-            wav_path.unlink()
-            logger.info(f"🗑️ Removido: {wav_path.name}")
-            
-            self._stats.processed_files += 1
-            
-            if self._on_file_processed:
-                self._on_file_processed(wav_path.name, txt_path.name)
-            
-            return True
-            
-        except Exception as e:
-            logger.error(f"❌ Erro ao processar {wav_path.name}: {e}")
-            self._stats.failed_files += 1
-            self._failed_files.append(str(wav_path))
-            
-            if self._on_error:
-                self._on_error(wav_path.name, e)
+            for attempt in range(retries):
+                try:
+                    # Transcrever
+                    transcriber = self._get_transcriber()
+                    result = transcriber.transcribe(str(wav_path))
+                    
+                    # Criar conteúdo do .txt com metadados
+                    txt_content = self._format_transcription(
+                        wav_name=wav_path.name,
+                        text=result.text,
+                        duration=result.duration,
+                        model=result.model,
+                        language=result.language,
+                        processing_time=result.processing_time,
+                    )
+                
+                    # Salvar .txt
+                    txt_path = wav_path.with_suffix(".txt")
+                    txt_path.write_text(txt_content, encoding="utf-8")
+                    logger.info(f"✅ Salvo: {txt_path.name}")
+                    
+                    # Remover .wav
+                    wav_path.unlink()
+                    logger.info(f"🗑️ Removido: {wav_path.name}")
+                    
+                    self._stats.processed_files += 1
+                    
+                    if self._on_file_processed:
+                        self._on_file_processed(wav_path.name, txt_path.name)
+                    
+                    return True
+                    
+                except Exception as e:
+                    logger.warning(f"Tentativa {attempt+1}/{retries} falhou para {wav_path.name}: {e}")
+                    if attempt < retries - 1:
+                        time.sleep(delay)
+                        delay *= 2
+                    else:
+                        logger.error(f"❌ Erro ao processar após retries: {e}")
+                        self._stats.failed_files += 1
+                        self._failed_files.append(wav_path.name)
+                        if self._on_error:
+                            self._on_error(wav_path.name, str(e))
             
             return False
-        
+            
         finally:
             self._stats.current_file = None
     

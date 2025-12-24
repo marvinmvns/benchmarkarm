@@ -769,21 +769,72 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         """Teste de microfone: grava 3s e retorna áudio."""
         try:
             import tempfile
-            import subprocess
             import os
+            from src.audio.capture import AudioCapture
+            
+            # Carregar configuração para usar parâmetros corretos
+            config = load_config()
+            audio_conf = config.get('audio', {})
+            
+            # Inicializar captura com parâmetros da config
+            capture = AudioCapture(
+                device=audio_conf.get('device', ''),
+                sample_rate=audio_conf.get('sample_rate', 16000),
+                channels=audio_conf.get('channels', 1),
+                chunk_size=audio_conf.get('chunk_size', 4096)
+            )
             
             # Gravar 3 segundos
+            logger.info("Iniciando gravação de teste (3s)...")
+            # Forçar 3s mesmo se houver silêncio, para garantir audio audível
+            buffer = capture.record(duration=3.0, stop_on_silence=False)
+            
+            # Salvar em temp file
             fd, filename = tempfile.mkstemp(suffix=".wav")
             os.close(fd)
             
-            # Tentar usar arecord (garantido no Pi)
-            # Device padrão
-            cmd = ["arecord", "-d", "3", "-f", "S16_LE", "-r", "16000", filename]
-            subprocess.run(cmd, check=True, timeout=5)
+            buffer.save(filename)
+            logger.info(f"Gravação de teste salva em {filename}")
             
             return send_file(filename, mimetype="audio/wav", as_attachment=False)
         except Exception as e:
             logger.error(f"Erro no teste de mic: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/test/live", methods=["POST"])
+    def test_live_pipeline():
+        """Teste de pipeline completo (Gravar -> Transcrever -> LLM)."""
+        try:
+            duration = 5.0 # Fixo em 5s para teste
+            
+            # Importar VoiceProcessor aqui para garantir config fresca
+            from src.pipeline import VoiceProcessor
+            
+            # Carregar config do disco
+            config_path = app.config["CONFIG_PATH"]
+            
+            logger.info(f"Iniciando teste live com config: {config_path}")
+            
+            with VoiceProcessor(config_path=config_path) as processor:
+                logger.info("Gravando...")
+                # Gravar manualmente para controlar duração
+                audio_buffer = processor.audio.record(duration=duration, stop_on_silence=False)
+                
+                logger.info("Processando...")
+                result = processor.process(
+                    audio=audio_buffer, 
+                    generate_summary=True
+                )
+                
+                return jsonify({
+                    "success": True,
+                    "text": result.text,
+                    "summary": result.summary,
+                    "stats": result.to_dict()
+                })
+
+        except Exception as e:
+            logger.error(f"Erro no teste live: {e}")
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/llm/models", methods=["GET"])

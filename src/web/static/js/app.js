@@ -2054,6 +2054,46 @@ async function fetchLLMModels(provider) {
     }
 }
 
+async function testLivePipeline() {
+    const btn = $('#btn-test-live');
+    const resultDiv = $('#live-test-result');
+    const originalText = btn.textContent;
+
+    try {
+        btn.textContent = '🎙️ Gravando (5s)...';
+        btn.disabled = true;
+        resultDiv.style.display = 'none';
+
+        if (isDirty) await saveConfig();
+
+        const response = await apiPost('test/live', { duration: 5.0 });
+
+        if (response.success) {
+            showToast('Teste concluído!', 'success');
+            resultDiv.style.display = 'block';
+            resultDiv.style.color = '#e2e8f0';
+            resultDiv.innerHTML = `
+                <strong>Transcrição:</strong><br>${response.text}<br><br>
+                <strong>Resumo:</strong><br>${response.summary}<br><br>
+                <small style="color:#888">
+                    Processamento: ${response.stats.transcription.processing_time.toFixed(2)}s | 
+                    LLM: ${response.stats.summary_time ? response.stats.summary_time.toFixed(2) : '0.00'}s
+                </small>
+            `;
+        } else {
+            throw new Error(response.error);
+        }
+    } catch (error) {
+        showToast('Erro no teste live: ' + error.message, 'error');
+        resultDiv.style.display = 'block';
+        resultDiv.style.color = '#ef4444';
+        resultDiv.textContent = `Erro: ${error.message}`;
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
 // ==========================================================================
 // Init
 // ==========================================================================
