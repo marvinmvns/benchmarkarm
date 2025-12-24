@@ -786,6 +786,97 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             logger.error(f"Erro no teste de mic: {e}")
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/llm/models", methods=["GET"])
+    def list_llm_models():
+        """Lista modelos do provedor configurado."""
+        try:
+            config = load_config()
+            provider_name = config.get('llm', {}).get('provider', 'local')
+            llm_config = config.get('llm', {})
+
+            provider = None
+            if provider_name == 'openai':
+                cfg = llm_config.get('openai', {})
+                from src.llm.api import OpenAIProvider
+                provider = OpenAIProvider(api_key=cfg.get('api_key'))
+            elif provider_name == 'chatmock':
+                cfg = llm_config.get('chatmock', {})
+                from src.llm.api import ChatMockProvider
+                provider = ChatMockProvider(base_url=cfg.get('base_url'))
+            elif provider_name == 'ollama':
+                cfg = llm_config.get('ollama', {})
+                from src.llm.api import OllamaProvider
+                provider = OllamaProvider(host=cfg.get('host'))
+            
+            if provider and hasattr(provider, 'list_models'):
+                models = provider.list_models()
+                return jsonify({"models": models})
+            
+            return jsonify({"models": []})
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/test/llm", methods=["POST"])
+    def test_llm_connection():
+        """Testa conexão com LLM."""
+        try:
+            # Usar configuração recebida ou carregar do disco
+            req_config = request.get_json() or {}
+            
+            # Se a requisição contiver a config completa, extrair LLM
+            # Senão, carregar do disco e fazer merge (simplificado aqui)
+            disk_config = load_config()
+            
+            # Merge simples para a seção LLM se fornecida
+            if 'llm' in req_config:
+                llm_config = req_config['llm']
+            else:
+                llm_config = disk_config.get('llm', {})
+            
+            provider_name = llm_config.get('provider', 'local')
+            
+            provider = None
+            if provider_name == 'openai':
+                cfg = llm_config.get('openai', {})
+                from src.llm.api import OpenAIProvider
+                provider = OpenAIProvider(
+                    api_key=cfg.get('api_key'),
+                    model=cfg.get('model', 'gpt-4o-mini')
+                )
+            elif provider_name == 'chatmock':
+                cfg = llm_config.get('chatmock', {})
+                from src.llm.api import ChatMockProvider
+                provider = ChatMockProvider(
+                    base_url=cfg.get('base_url'), 
+                    model=cfg.get('model', 'gpt-5'),
+                    reasoning_effort=cfg.get('reasoning_effort', 'medium'),
+                    enable_web_search=cfg.get('enable_web_search', False)
+                )
+            elif provider_name == 'ollama':
+                cfg = llm_config.get('ollama', {})
+                from src.llm.api import OllamaProvider
+                provider = OllamaProvider(
+                    host=cfg.get('host'),
+                    model=cfg.get('model', 'tinyllama')
+                )
+            elif provider_name == 'local':
+                 # Testar local?
+                 return jsonify({"success": True, "response": "Modo local não requer teste de rede.", "latency": 0})
+
+            if provider:
+                response = provider.generate("Olá, teste de conexão.")
+                return jsonify({
+                    "success": True, 
+                    "response": response.text, 
+                    "latency": response.processing_time
+                })
+            else:
+                return jsonify({"success": False, "error": f"Provedor {provider_name} não suportado para teste"}), 400
+
+        except Exception as e:
+            logger.error(f"Erro ao testar LLM: {e}")
+            return jsonify({"success": False, "error": str(e)}), 500
+
     @app.route("/api/audio/test/speaker", methods=["POST"])
     def test_speaker():
         """Teste de falante: toca um tom."""

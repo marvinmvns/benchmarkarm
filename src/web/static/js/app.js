@@ -1954,6 +1954,107 @@ async function testWhisperTranscription() {
 }
 
 // ==========================================================================
+// LLM Testing & Models
+// ==========================================================================
+
+async function testLLMConnection() {
+    const btn = $('#btn-test-llm');
+    const resultDiv = $('#llm-test-result');
+    const originalText = btn.textContent;
+
+    try {
+        btn.textContent = '⏳ Testando...';
+        btn.disabled = true;
+        resultDiv.style.display = 'none';
+
+        // Save first to ensure server has latest config
+        collectFormValues();
+        const response = await apiPost('test/llm', config);
+
+        if (response.success) {
+            showToast(`Sucesso! Latência: ${response.latency.toFixed(2)}s`, 'success');
+            resultDiv.style.display = 'block';
+            resultDiv.style.color = '#4ade80';
+            resultDiv.textContent = `Resposta: "${response.response}"\nLatência: ${response.latency.toFixed(3)}s`;
+        } else {
+            throw new Error(response.error);
+        }
+    } catch (error) {
+        showToast('Erro no teste: ' + error.message, 'error');
+        resultDiv.style.display = 'block';
+        resultDiv.style.color = '#ef4444';
+        resultDiv.textContent = `Erro: ${error.message}`;
+    } finally {
+        btn.textContent = originalText;
+        btn.disabled = false;
+    }
+}
+
+async function fetchLLMModels(provider) {
+    try {
+        showToast('Buscando modelos... (Salve a config antes se alterou URL/Key)', 'info');
+
+        // Auto-save if dirty to ensure backend has correct URL
+        if (isDirty) {
+            await saveConfig();
+        }
+
+        const response = await apiGet('llm/models');
+
+        if (response.error) throw new Error(response.error);
+
+        const models = response.models;
+        if (!models || models.length === 0) {
+            showToast('Nenhum modelo encontrado.', 'warning');
+            return;
+        }
+
+        showToast(`${models.length} modelos encontrados!`, 'success');
+
+        if (provider === 'chatmock') {
+            const select = $('#chatmock_model');
+            const current = select.value;
+            select.innerHTML = '';
+
+            models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                opt.textContent = m;
+                if (m === current) opt.selected = true;
+                select.appendChild(opt);
+            });
+            if (!models.includes(current) && current) {
+                const opt = document.createElement('option');
+                opt.value = current;
+                opt.textContent = `${current} (Atual)`;
+                opt.selected = true;
+                select.appendChild(opt);
+            }
+        } else if (provider === 'openai') {
+            const input = $('#api_model');
+            let datalist = $('#openai_models_list');
+            if (!datalist) {
+                datalist = document.createElement('datalist');
+                datalist.id = 'openai_models_list';
+                document.body.appendChild(datalist);
+                input.setAttribute('list', 'openai_models_list');
+            }
+
+            datalist.innerHTML = '';
+            models.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m;
+                datalist.appendChild(opt);
+            });
+            input.focus();
+        }
+
+    } catch (error) {
+        showToast('Erro ao buscar modelos: ' + error.message, 'error');
+    }
+}
+
+// ==========================================================================
 // Init
 // ==========================================================================
 

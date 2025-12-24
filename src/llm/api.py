@@ -51,6 +51,18 @@ class OpenAIProvider(LLMProvider):
                 )
         return self._client
 
+    def list_models(self) -> list[str]:
+        """Lista modelos disponíveis."""
+        if not self.api_key:
+            return []
+        
+        client = self._get_client()
+        try:
+            models = client.models.list()
+            return [m.id for m in models.data]
+        except Exception:
+            return []
+
     def generate(self, prompt: str, **kwargs) -> LLMResponse:
         """Gera resposta usando OpenAI API."""
         if not self.api_key:
@@ -394,6 +406,15 @@ class ChatMockProvider(LLMProvider):
                     "openai não instalado. Execute: pip install openai"
                 )
         return self._client
+
+    def list_models(self) -> list[str]:
+        """Lista modelos disponíveis."""
+        client = self._get_client()
+        try:
+            models = client.models.list()
+            return [m.id for m in models.data]
+        except Exception:
+            return []
 
     def generate(self, prompt: str, **kwargs) -> LLMResponse:
         """Gera resposta usando ChatMock API."""

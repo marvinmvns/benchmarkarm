@@ -13,7 +13,7 @@ from .audio.vad import VoiceActivityDetector
 from .transcription.whisper import WhisperTranscriber, TranscriptionResult, get_transcriber
 from .llm.base import LLMProvider, LLMResponse
 from .llm.local import LocalLLM
-from .llm.api import OpenAIProvider, AnthropicProvider, OllamaProvider
+from .llm.api import OpenAIProvider, AnthropicProvider, OllamaProvider, ChatMockProvider
 from .utils.config import Config, load_config
 from .utils.cache import Cache, get_cache
 
@@ -162,6 +162,16 @@ class VoiceProcessor:
                 model=ollama_cfg.model,
                 max_tokens=ollama_cfg.max_tokens,
                 host=ollama_cfg.host,
+            )
+        elif provider == "chatmock":
+            chatmock_cfg = llm_config.chatmock
+            self.llm = ChatMockProvider(
+                model=chatmock_cfg.model,
+                max_tokens=chatmock_cfg.max_tokens,
+                temperature=chatmock_cfg.temperature,
+                base_url=chatmock_cfg.base_url,
+                reasoning_effort=chatmock_cfg.reasoning_effort,
+                enable_web_search=chatmock_cfg.enable_web_search,
             )
         else:
             logger.warning(f"Provedor LLM desconhecido: {provider}")

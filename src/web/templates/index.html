@@ -361,7 +361,9 @@
                     </div>
 
                     <div class="form-group">
-                        <label for="chatmock_model">Modelo</label>
+                        <label for="chatmock_model">Modelo <a href="#"
+                                onclick="fetchLLMModels('chatmock'); return false;"
+                                style="font-size: 0.8em; color: #aaa;">🔄 Listar</a></label>
                         <select id="chatmock_model" name="llm.chatmock.model">
                             <option value="gpt-5">gpt-5 (Padrão)</option>
                             <option value="gpt-5.1">gpt-5.1</option>
@@ -409,7 +411,8 @@
                         <small>⚠️ Nunca compartilhe sua API key</small>
                     </div>
                     <div class="form-group">
-                        <label for="api_model">Modelo</label>
+                        <label for="api_model">Modelo <a href="#" onclick="fetchLLMModels('openai'); return false;"
+                                style="font-size: 0.8em; color: #aaa;">🔄 Listar</a></label>
                         <input type="text" id="api_model" value="gpt-4o-mini">
                     </div>
                 </div>
@@ -420,6 +423,17 @@
                         value="0.3">
                     <span id="llm_temperature_value">0.3</span>
                     <small>0 = determinístico, 1 = criativo</small>
+                </div>
+
+                <div class="form-group" style="margin-top: 20px; border-top: 1px solid #444; padding-top: 15px;">
+                    <h3>Teste de Conexão</h3>
+                    <p class="force-small">Envia uma mensagem de teste ("Olá") para verificar a configuração.</p>
+                    <button type="button" class="btn btn-secondary" onclick="testLLMConnection()" id="btn-test-llm">
+                        🧪 Testar Conexão
+                    </button>
+                    <div id="llm-test-result"
+                        style="margin-top: 10px; font-family: monospace; font-size: 0.9em; display: none; padding: 10px; background: #222; border-radius: 4px;">
+                    </div>
                 </div>
             </section>
 
