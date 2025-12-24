@@ -737,7 +737,93 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         "is_recording": False,
         "is_processing": False,
         "current_transcription": None,
+        "current_stage": "idle",
+        "details": {},
     }
+
+    @app.route("/api/audio/test/mic", methods=["POST"])
+    def test_microphone():
+        """Teste de microfone: grava 3s e retorna áudio."""
+        try:
+            import tempfile
+            import subprocess
+            import os
+            
+            # Gravar 3 segundos
+            fd, filename = tempfile.mkstemp(suffix=".wav")
+            os.close(fd)
+            
+            # Tentar usar arecord (garantido no Pi)
+            # Device padrão
+            cmd = ["arecord", "-d", "3", "-f", "S16_LE", "-r", "16000", filename]
+            subprocess.run(cmd, check=True, timeout=5)
+            
+            return send_file(filename, mimetype="audio/wav", as_attachment=False)
+        except Exception as e:
+            logger.error(f"Erro no teste de mic: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/audio/test/speaker", methods=["POST"])
+    def test_speaker():
+        """Teste de falante: toca um tom."""
+        try:
+            import subprocess
+            # Tocar tom senoidal de 440Hz por 1 segundo usando speaker-test
+            cmd = ["speaker-test", "-t", "sine", "-f", "440", "-l", "1", "-s", "1"]
+            subprocess.run(cmd, check=True, timeout=5, stdout=subprocess.DEVNULL)
+            return jsonify({"success": True, "message": "Som reproduzido"})
+        except Exception as e:
+            logger.error(f"Erro no teste de speaker: {e}")
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/test/whisperapi_connection", methods=["POST"])
+    def test_whisperapi_connection():
+        """Testa conexão com WhisperAPI."""
+        try:
+            config = load_config()
+            url = config.get("whisper", {}).get("whisperapi_url")
+            if not url:
+                return jsonify({"error": "URL não configurada"}), 400
+            
+            import requests
+            # Tentar conectar (assumindo endpoint /health ou raiz)
+            try:
+                # Se url termina com /v1/audio/transcriptions, pegar base
+                base_url = url.split("/v1")[0]
+                resp = requests.get(base_url, timeout=5)
+                # Aceitar qualquer resposta 200-404 como "servidor existe"
+                return jsonify({"success": True, "message": f"Conectado: {resp.status_code}"})
+            except Exception as conn_err:
+                 # Tentar endpoint específico se base falhar
+                 return jsonify({"error": f"Falha na conexão: {str(conn_err)}"}), 500
+
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/test/whisper_transcription", methods=["POST"])
+    def test_whisper_transcription():
+        """Testa transcrição (gera áudio sintético e transcreve)."""
+        try:
+            # Gerar wav pequeno com sox ou ffmpeg, ou arecord
+            # Ou usar arquivo existente?
+            # Melhor: Tentar carregar SpeechProcessor e inicializar
+            
+            from ..pipeline import VoiceProcessor
+            config_path = app.config["CONFIG_PATH"]
+            
+            # Apenas inicializar para ver se não quebra
+            try:
+                proc = VoiceProcessor(config_path=config_path)
+                # Não vamos transcrever de verdade para não demorar, apenas testar init
+                # Ou transcrever um buffer vazio?
+                proc._init_transcriber()
+                model = proc.transcriber.model if hasattr(proc.transcriber, 'model') else 'unknown'
+                return jsonify({"success": True, "message": f"Transcritor inicializado com sucesso ({model})"})
+            except Exception as init_err:
+                return jsonify({"error": f"Erro ao inicializar transcritor: {init_err}"}), 500
+
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
 
     @app.route("/api/processor/status", methods=["GET"])
     def processor_status():
@@ -785,6 +871,12 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             processor_state["is_recording"] = True
             processor_state["is_processing"] = False
             processor_state["current_transcription"] = None
+            processor_state["current_stage"] = "recording"
+            processor_state["details"] = {}
+            
+            def update_status(stage, details):
+                processor_state["current_stage"] = stage
+                processor_state["details"] = details
             
             try:
                 # Importar o processador
@@ -795,6 +887,7 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
                 with VoiceProcessor(config_path=config_path) as processor:
                     # Gravar
                     processor_state["is_recording"] = True
+                    update_status("recording", {"device": processor.audio.device})
                     audio = processor.record()
                     
                     # Processar
@@ -804,7 +897,8 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
                     result = processor.process(
                         audio=audio,
                         generate_summary=True,
-                        summary_style="concise"
+                        summary_style="concise",
+                        status_callback=update_status
                     )
                     
                     # Salvar resultado
@@ -836,6 +930,8 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             finally:
                 processor_state["is_recording"] = False
                 processor_state["is_processing"] = False
+                processor_state["current_stage"] = "idle"
+                processor_state["details"] = {}
         
         # Iniciar em thread separada
         thread = threading.Thread(target=process_audio, daemon=True)

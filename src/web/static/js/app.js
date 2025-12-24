@@ -532,6 +532,13 @@ function initEventListeners() {
     $('#btn-refresh-system').addEventListener('click', refreshSystemInfo);
     $('#btn-refresh-queue').addEventListener('click', refreshQueueStats);
 
+    // Whisper Tests
+    const btnTestWhisperAPI = $('#btn-test-whisperapi');
+    if (btnTestWhisperAPI) btnTestWhisperAPI.addEventListener('click', testWhisperAPIConnection);
+
+    const btnTestWhisper = $('#btn-test-whisper');
+    if (btnTestWhisper) btnTestWhisper.addEventListener('click', testWhisperTranscription);
+
     // Export config
     $('#btn-export').addEventListener('click', () => {
         const blob = new Blob([JSON.stringify(config, null, 2)], { type: 'application/json' });
@@ -643,11 +650,25 @@ function startStatusPolling() {
                 const status = result.status;
                 const recordingStatusText = $('#recording-status-text');
 
-                if (status.is_recording) {
-                    recordingStatusText.textContent = 'Gravando áudio...';
+                // Visualização detalhada de status
+                let statusMsg = '';
+                if (status.current_stage === 'recording') {
+                    statusMsg = '🎙️ Gravando áudio...';
+                } else if (status.current_stage === 'transcribing') {
+                    const details = status.details || {};
+                    statusMsg = `📝 Transcrevendo (${details.model || 'auto'})...`;
+                } else if (status.current_stage === 'llm_processing') {
+                    const details = status.details || {};
+                    statusMsg = `🧠 Processando LLM (${details.provider || 'local'})...`;
                 } else if (status.is_processing) {
-                    recordingStatusText.textContent = 'Processando transcrição...';
-                } else if (status.current_transcription) {
+                    statusMsg = '⚙️ Processando...';
+                }
+
+                if (statusMsg) {
+                    recordingStatusText.textContent = statusMsg;
+                }
+
+                if (status.current_transcription) {
                     // Processamento concluído
                     stopStatusPolling();
                     resetRecordingUI();
@@ -662,12 +683,72 @@ function startStatusPolling() {
                 }
 
                 // Atualizar status do processador
-                updateProcessorStatus(result);
+                // updateProcessorStatus(result); // Função não definida ou externa
             }
         } catch (error) {
             console.error('Erro no polling:', error);
         }
     }, 500);
+}
+
+async function testMicrophone() {
+    const btn = $('#btn-test-mic');
+    const resultDiv = $('#mic-test-result');
+    const audio = new Audio();
+
+    btn.disabled = true;
+    btn.textContent = '⏳ Gravando (3s)...';
+    resultDiv.innerHTML = '';
+
+    try {
+        const response = await fetch('/api/audio/test/mic', { method: 'POST' });
+
+        if (!response.ok) throw new Error('Falha na gravação');
+
+        const blob = await response.blob();
+        const url = URL.createObjectURL(blob);
+
+        audio.src = url;
+        audio.controls = true;
+        resultDiv.appendChild(audio);
+
+        btn.textContent = '▶️ Reproduzindo...';
+        await audio.play();
+
+        audio.onended = () => {
+            btn.disabled = false;
+            btn.textContent = '🎤 Testar Gravação';
+        };
+
+    } catch (error) {
+        console.error(error);
+        resultDiv.textContent = 'Erro: ' + error.message;
+        btn.disabled = false;
+        btn.textContent = '🎤 Testar Gravação';
+    }
+}
+
+async function testSpeaker() {
+    const btn = $('#btn-test-speaker');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '🔊 Tocando...';
+
+    try {
+        const result = await apiPost('audio/test/speaker', {});
+        if (result.success) {
+            showToast('Som reproduzido com sucesso', 'success');
+        } else {
+            showToast('Erro: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('Erro na requisição', 'error');
+    } finally {
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }, 1000);
+    }
 }
 
 function stopStatusPolling() {
@@ -1823,6 +1904,52 @@ function initLogsTab() {
     const logsTabBtn = document.querySelector('[data-tab="logs"]');
     if (logsTabBtn) {
         logsTabBtn.addEventListener('click', () => loadLogs());
+    }
+}
+
+async function testWhisperAPIConnection() {
+    const btn = $('#btn-test-whisperapi');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Conectando...';
+
+    try {
+        const result = await apiPost('test/whisperapi_connection', {});
+        if (result.success) {
+            showToast(result.message, 'success');
+        } else {
+            showToast('Erro: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('Erro de rede', 'error');
+    } finally {
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }, 1000);
+    }
+}
+
+async function testWhisperTranscription() {
+    const btn = $('#btn-test-whisper');
+    const originalText = btn.textContent;
+    btn.disabled = true;
+    btn.textContent = '⏳ Testando...';
+
+    try {
+        const result = await apiPost('test/whisper_transcription', {});
+        if (result.success) {
+            showToast(result.message, 'success');
+        } else {
+            showToast('Erro: ' + result.error, 'error');
+        }
+    } catch (error) {
+        showToast('Erro de rede', 'error');
+    } finally {
+        setTimeout(() => {
+            btn.disabled = false;
+            btn.textContent = originalText;
+        }, 1000);
     }
 }
 

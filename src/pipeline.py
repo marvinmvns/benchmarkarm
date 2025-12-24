@@ -275,6 +275,7 @@ class VoiceProcessor:
         generate_summary: bool = True,
         summary_style: str = "concise",
         custom_prompt: Optional[str] = None,
+        status_callback: Optional[Callable[[str, dict], None]] = None,
     ) -> ProcessingResult:
         """
         Processa áudio completo: gravação -> transcrição -> LLM.
@@ -284,6 +285,7 @@ class VoiceProcessor:
             generate_summary: Se deve gerar resumo
             summary_style: Estilo do resumo
             custom_prompt: Prompt customizado para LLM
+            status_callback: Função callback(stage_name, details_dict)
 
         Returns:
             Resultado completo do processamento
@@ -292,11 +294,19 @@ class VoiceProcessor:
 
         # Gravar se necessário
         if audio is None:
+            if status_callback:
+                status_callback("recording", {})
             logger.info("Iniciando gravação...")
             audio = self.record()
             logger.info(f"Gravação concluída: {audio.duration:.1f}s")
 
         # Transcrever
+        if status_callback:
+            status_callback("transcribing", {
+                "provider": self.config.whisper.provider,
+                "model": self.config.whisper.model,
+                "duration": round(audio.duration, 1)
+            })
         logger.info("Transcrevendo áudio...")
         transcription = self.transcribe(audio)
         logger.info(f"Transcrição concluída: {len(transcription.text)} caracteres")
@@ -304,6 +314,10 @@ class VoiceProcessor:
         # Processar com LLM
         llm_response = None
         if self.llm and generate_summary and transcription.text.strip():
+            if status_callback:
+                status_callback("llm_processing", {
+                    "provider": self.config.llm.provider,
+                })
             logger.info("Processando com LLM...")
 
             if custom_prompt:

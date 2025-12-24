@@ -159,14 +159,31 @@
                 <div class="form-group">
                     <label for="vad_aggressiveness">Agressividade VAD</label>
                     <input type="range" id="vad_aggressiveness" name="audio.vad.aggressiveness" min="0" max="3"
-                        value="2">
+                        value="2" oninput="$('#vad_aggressiveness_value').textContent=this.value">
                     <span id="vad_aggressiveness_value">2</span>
                     <small>0 = menos filtro, 3 = mais filtro de ruído</small>
                 </div>
 
-                <div class="form-group">
-                    <button type="button" id="btn-test-audio" class="btn btn-secondary">🔊 Testar Áudio</button>
-                    <pre id="audio-test-result" class="result-box"></pre>
+                <hr>
+
+                <h3>🧪 Testes de Hardware</h3>
+                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div class="card bg-light">
+                        <h4>Microfone</h4>
+                        <p>Grava 3 segundos e reproduz aqui.</p>
+                        <button class="btn btn-secondary" onclick="testMicrophone()" id="btn-test-mic">
+                            🎤 Testar Gravação
+                        </button>
+                        <div id="mic-test-result" style="margin-top: 10px;"></div>
+                    </div>
+
+                    <div class="card bg-light">
+                        <h4>Falante</h4>
+                        <p>Toca um tom no Raspberry Pi.</p>
+                        <button class="btn btn-secondary" onclick="testSpeaker()" id="btn-test-speaker">
+                            🔊 Testar Som
+                        </button>
+                    </div>
                 </div>
             </section>
 
