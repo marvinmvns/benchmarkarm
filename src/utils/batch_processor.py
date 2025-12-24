@@ -119,15 +119,15 @@ class BatchProcessor:
                     'beam_size': whisper_config.beam_size,
                     'quantization': whisper_config.quantization,
                     'stream_mode': getattr(whisper_config, 'stream_mode', False),
+                    # WhisperAPI settings - use correct config attribute names
+                    'whisperapi_url': getattr(whisper_config, 'whisperapi_url', 'http://127.0.0.1:3001'),
+                    'whisperapi_timeout': getattr(whisper_config, 'whisperapi_timeout', 300),
                 }
-
-                # Se for API provider, adicionar configurações de API
-                if hasattr(config, 'whisper_api'):
-                    config_dict['api_url'] = getattr(config.whisper_api, 'api_url', '')
-                    config_dict['api_key'] = getattr(config.whisper_api, 'api_key', '')
 
                 self._transcriber = get_transcriber(config_dict)
                 logger.info(f"BatchProcessor usando Whisper provider: {config_dict.get('provider', 'local')}")
+                if config_dict['provider'] == 'whisperapi':
+                    logger.info(f"WhisperAPI URL: {config_dict['whisperapi_url']}")
             except Exception as e:
                 logger.error(f"Erro ao criar transcritor: {e}")
                 raise
