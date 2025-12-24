@@ -1932,24 +1932,70 @@ async function testWhisperAPIConnection() {
 
 async function testWhisperTranscription() {
     const btn = $('#btn-test-whisper');
+    const resultDiv = $('#whisper-test-result');
+    const textDiv = $('#whisper-test-text');
+    const timingDiv = $('#whisper-test-timing');
+    const durationSelect = $('#test_duration');
+
     const originalText = btn.textContent;
+    const duration = parseInt(durationSelect?.value || '5', 10);
+
     btn.disabled = true;
-    btn.textContent = '⏳ Testando...';
+    btn.textContent = `🎤 Gravando ${duration}s...`;
+    resultDiv.style.display = 'none';
+    resultDiv.classList.remove('error');
 
     try {
-        const result = await apiPost('test/whisper_transcription', {});
+        // Atualizar botão durante gravação
+        let countdown = duration;
+        const countdownInterval = setInterval(() => {
+            countdown--;
+            if (countdown > 0) {
+                btn.textContent = `🎤 Gravando ${countdown}s...`;
+            } else {
+                btn.textContent = '⏳ Transcrevendo...';
+                clearInterval(countdownInterval);
+            }
+        }, 1000);
+
+        const result = await apiPost('test/whisper_transcription', { duration });
+        clearInterval(countdownInterval);
+
         if (result.success) {
-            showToast(result.message, 'success');
+            // Exibir resultado
+            textDiv.textContent = result.text || '(Nenhum texto detectado)';
+
+            // Exibir timing
+            const timing = result.timing || {};
+            timingDiv.innerHTML = `
+                <span>🎤 Gravação: ${timing.record_seconds || 0}s</span>
+                <span>🤖 Transcrição: ${timing.transcribe_seconds || 0}s</span>
+                <span>⏱️ Total: ${timing.total_seconds || 0}s</span>
+                <span>🌍 Idioma: ${result.language || 'auto'}</span>
+                <span>📡 Provider: ${result.provider || 'local'}</span>
+            `;
+
+            resultDiv.style.display = 'block';
+            showToast('Transcrição concluída!', 'success');
         } else {
+            // Exibir erro
+            textDiv.textContent = result.error || 'Erro desconhecido';
+            timingDiv.innerHTML = '';
+            resultDiv.classList.add('error');
+            resultDiv.querySelector('h4').textContent = '❌ Erro:';
+            resultDiv.style.display = 'block';
             showToast('Erro: ' + result.error, 'error');
         }
     } catch (error) {
+        textDiv.textContent = 'Erro de rede: ' + error.message;
+        timingDiv.innerHTML = '';
+        resultDiv.classList.add('error');
+        resultDiv.querySelector('h4').textContent = '❌ Erro:';
+        resultDiv.style.display = 'block';
         showToast('Erro de rede', 'error');
     } finally {
-        setTimeout(() => {
-            btn.disabled = false;
-            btn.textContent = originalText;
-        }, 1000);
+        btn.disabled = false;
+        btn.textContent = originalText;
     }
 }
 

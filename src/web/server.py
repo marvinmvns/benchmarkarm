@@ -1285,27 +1285,138 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
 
     @app.route("/api/test/whisper_transcription", methods=["POST"])
     def test_whisper_transcription():
-        """Testa transcrição (gera áudio sintético e transcreve)."""
+        """Grava áudio do microfone e transcreve usando o provider configurado."""
         try:
-            # Gerar wav pequeno com sox ou ffmpeg, ou arecord
-            # Ou usar arquivo existente?
-            # Melhor: Tentar carregar SpeechProcessor e inicializar
+            import tempfile
+            import subprocess
+            import time as time_module
             
-            from ..pipeline import VoiceProcessor
-            config_path = app.config["CONFIG_PATH"]
+            # Parâmetros de gravação
+            data = request.get_json() or {}
+            duration = min(data.get("duration", 5), 15)  # Max 15 segundos
             
-            # Apenas inicializar para ver se não quebra
+            config = load_config()
+            whisper_config = config.get("whisper", {})
+            audio_config = config.get("audio", {})
+            provider = whisper_config.get("provider", "local")
+            
+            # Criar arquivo temporário para gravação
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as tmp:
+                temp_path = tmp.name
+            
             try:
-                proc = VoiceProcessor(config_path=config_path)
-                # Não vamos transcrever de verdade para não demorar, apenas testar init
-                # Ou transcrever um buffer vazio?
-                proc._init_transcriber()
-                model = proc.transcriber.model if hasattr(proc.transcriber, 'model') else 'unknown'
-                return jsonify({"success": True, "message": f"Transcritor inicializado com sucesso ({model})"})
-            except Exception as init_err:
-                return jsonify({"error": f"Erro ao inicializar transcritor: {init_err}"}), 500
+                # Fase 1: Gravar áudio usando arecord
+                logger.info(f"🎤 Gravando {duration}s de áudio para teste...")
+                
+                sample_rate = audio_config.get("sample_rate", 16000)
+                
+                record_cmd = [
+                    "arecord",
+                    "-D", "default",
+                    "-f", "S16_LE",
+                    "-r", str(sample_rate),
+                    "-c", "1",
+                    "-d", str(duration),
+                    "-t", "wav",
+                    temp_path
+                ]
+                
+                start_record = time_module.time()
+                result = subprocess.run(
+                    record_cmd,
+                    capture_output=True,
+                    timeout=duration + 5
+                )
+                record_time = time_module.time() - start_record
+                
+                if result.returncode != 0:
+                    error_msg = result.stderr.decode() if result.stderr else "Erro desconhecido"
+                    logger.error(f"Falha na gravação: {error_msg}")
+                    return jsonify({
+                        "error": f"Falha na gravação: {error_msg}"
+                    }), 500
+                
+                # Verificar se arquivo foi criado
+                import os
+                if not os.path.exists(temp_path) or os.path.getsize(temp_path) < 1000:
+                    return jsonify({
+                        "error": "Arquivo de áudio vazio ou muito pequeno"
+                    }), 500
+                
+                file_size = os.path.getsize(temp_path)
+                logger.info(f"✅ Áudio gravado: {file_size} bytes em {record_time:.1f}s")
+                
+                # Fase 2: Transcrever usando o provider configurado
+                start_transcribe = time_module.time()
+                
+                if provider == "whisperapi":
+                    # Usar WhisperAPIClient
+                    from ..transcription.whisper import WhisperAPIClient
+                    
+                    url = whisper_config.get("whisperapi_url", "http://127.0.0.1:3001")
+                    client = WhisperAPIClient(
+                        base_url=url,
+                        language=whisper_config.get("language", "pt"),
+                        timeout=whisper_config.get("whisperapi_timeout", 120),
+                    )
+                    
+                    try:
+                        result = client.transcribe(temp_path)
+                        text = result.text
+                        detected_language = result.language
+                    finally:
+                        client.close()
+                
+                else:
+                    # Usar whisper.cpp local
+                    from ..transcription.whisper import WhisperTranscriber
+                    
+                    transcriber = WhisperTranscriber(
+                        model=whisper_config.get("model", "tiny"),
+                        language=whisper_config.get("language", "pt"),
+                        use_cpp=whisper_config.get("use_cpp", True),
+                        threads=whisper_config.get("threads", 2),
+                    )
+                    
+                    result = transcriber.transcribe(temp_path)
+                    text = result.text
+                    detected_language = result.language
+                
+                transcribe_time = time_module.time() - start_transcribe
+                total_time = record_time + transcribe_time
+                
+                logger.info(f"📝 Transcrição: '{text[:50]}...' ({transcribe_time:.1f}s)")
+                
+                return jsonify({
+                    "success": True,
+                    "text": text,
+                    "language": detected_language,
+                    "provider": provider,
+                    "timing": {
+                        "record_seconds": round(record_time, 2),
+                        "transcribe_seconds": round(transcribe_time, 2),
+                        "total_seconds": round(total_time, 2),
+                    },
+                    "audio": {
+                        "duration_seconds": duration,
+                        "file_size_bytes": file_size,
+                        "sample_rate": sample_rate,
+                    }
+                })
+                
+            finally:
+                # Limpar arquivo temporário
+                try:
+                    import os
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                except Exception:
+                    pass
 
+        except subprocess.TimeoutExpired:
+            return jsonify({"error": "Timeout na gravação de áudio"}), 500
         except Exception as e:
+            logger.error(f"Erro no teste de transcrição: {e}")
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/processor/status", methods=["GET"])

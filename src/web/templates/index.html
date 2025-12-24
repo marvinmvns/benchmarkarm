@@ -300,12 +300,32 @@
                     </select>
                 </div>
 
-                <!-- Test Button -->
-                <div class="form-group">
-                    <button type="button" id="btn-test-whisper" class="btn btn-secondary">
-                        🧪 Testar Transcrição
-                    </button>
-                    <span id="whisper-test-result"></span>
+                <!-- Test Section -->
+                <div class="config-section">
+                    <h3>🧪 Teste de Transcrição</h3>
+                    <p class="info-box">Grava áudio do microfone e transcreve usando o provider configurado acima.</p>
+
+                    <div class="form-group">
+                        <label for="test_duration">Duração da Gravação</label>
+                        <select id="test_duration">
+                            <option value="3">3 segundos</option>
+                            <option value="5" selected>5 segundos</option>
+                            <option value="10">10 segundos</option>
+                            <option value="15">15 segundos</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <button type="button" id="btn-test-whisper" class="btn btn-primary">
+                            🎤 Gravar e Transcrever
+                        </button>
+                    </div>
+
+                    <div id="whisper-test-result" class="test-result-box" style="display:none;">
+                        <h4>Resultado:</h4>
+                        <div id="whisper-test-text" class="transcription-text"></div>
+                        <div id="whisper-test-timing" class="timing-info"></div>
+                    </div>
                 </div>
             </section>
 

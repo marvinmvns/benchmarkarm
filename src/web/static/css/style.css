@@ -276,6 +276,57 @@ input[type="checkbox"] {
     white-space: pre-wrap;
 }
 
+/* Test Result Box */
+.test-result-box {
+    background: linear-gradient(135deg, rgba(16, 185, 129, 0.1), rgba(16, 185, 129, 0.05));
+    border: 1px solid var(--success);
+    border-radius: 8px;
+    padding: 16px;
+    margin-top: 16px;
+}
+
+.test-result-box h4 {
+    color: var(--success);
+    font-size: 0.9rem;
+    margin-bottom: 12px;
+}
+
+.test-result-box.error {
+    background: linear-gradient(135deg, rgba(239, 68, 68, 0.1), rgba(239, 68, 68, 0.05));
+    border-color: var(--danger);
+}
+
+.test-result-box.error h4 {
+    color: var(--danger);
+}
+
+.transcription-text {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 12px;
+    font-size: 0.95rem;
+    line-height: 1.6;
+    max-height: 150px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+}
+
+.timing-info {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    margin-top: 12px;
+    font-size: 0.8rem;
+    color: var(--text-muted);
+}
+
+.timing-info span {
+    background: var(--bg);
+    padding: 4px 8px;
+    border-radius: 4px;
+}
+
 /* Config Section (Styled as Card) */
 .config-section {
     background: var(--bg-card);
