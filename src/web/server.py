@@ -2019,6 +2019,140 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             return jsonify({"error": str(e)}), 500
 
     # ==========================================================================
+    # Job Manager - Gerenciamento Inteligente de Jobs
+    # ==========================================================================
+
+    @app.route("/api/jobs/stats", methods=["GET"])
+    def job_manager_stats():
+        """Retorna estatísticas do JobManager."""
+        try:
+            processor = get_batch_processor()
+            if processor:
+                stats = processor.get_job_manager_stats()
+                return jsonify({
+                    "success": True,
+                    "stats": stats,
+                })
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": "Processador não disponível",
+                })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/jobs/servers", methods=["GET"])
+    def job_manager_servers():
+        """Retorna status dos servidores WhisperAPI."""
+        try:
+            processor = get_batch_processor()
+            if processor:
+                servers = processor.get_server_status()
+                return jsonify({
+                    "success": True,
+                    "servers": servers,
+                    "total": len(servers),
+                })
+            else:
+                return jsonify({
+                    "success": False,
+                    "servers": [],
+                })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/jobs/pending", methods=["GET"])
+    def job_manager_pending():
+        """Retorna jobs pendentes de processamento."""
+        try:
+            from ..transcription.job_manager import get_job_manager
+            job_manager = get_job_manager()
+
+            pending = job_manager.get_pending_jobs()
+            return jsonify({
+                "success": True,
+                "jobs": [job.to_dict() for job in pending],
+                "total": len(pending),
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/jobs/in-progress", methods=["GET"])
+    def job_manager_in_progress():
+        """Retorna jobs em andamento."""
+        try:
+            from ..transcription.job_manager import get_job_manager
+            job_manager = get_job_manager()
+
+            in_progress = job_manager.get_in_progress_jobs()
+            return jsonify({
+                "success": True,
+                "jobs": [job.to_dict() for job in in_progress],
+                "total": len(in_progress),
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/jobs/retry", methods=["POST"])
+    def job_manager_retry():
+        """Força retry de jobs falhos."""
+        try:
+            processor = get_batch_processor()
+            if processor:
+                retried = processor._process_pending_retries()
+                return jsonify({
+                    "success": True,
+                    "retried": retried,
+                    "message": f"{retried} jobs reprocessados",
+                })
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": "Processador não disponível",
+                })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/jobs/recover", methods=["POST"])
+    def job_manager_recover():
+        """Recupera jobs pendentes após restart."""
+        try:
+            processor = get_batch_processor()
+            if processor:
+                recovered = processor.recover_pending_jobs()
+                return jsonify({
+                    "success": True,
+                    "recovered": recovered,
+                    "message": f"{recovered} jobs marcados para retry",
+                })
+            else:
+                return jsonify({
+                    "success": False,
+                    "error": "Processador não disponível",
+                })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/jobs/cleanup", methods=["POST"])
+    def job_manager_cleanup():
+        """Remove jobs antigos completados ou falhos."""
+        try:
+            from ..transcription.job_manager import get_job_manager
+            job_manager = get_job_manager()
+
+            # Obter max_age_hours do request body ou usar padrão
+            data = request.get_json() or {}
+            max_age_hours = data.get("max_age_hours", 24)
+
+            job_manager.cleanup_old_jobs(max_age_hours)
+            return jsonify({
+                "success": True,
+                "message": f"Jobs com mais de {max_age_hours}h removidos",
+            })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # ==========================================================================
     # Arquivos de Transcrição
     # ==========================================================================
 

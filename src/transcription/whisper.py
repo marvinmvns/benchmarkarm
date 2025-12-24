@@ -685,7 +685,7 @@ class FasterWhisperTranscriber:
 class WhisperAPIClient:
     """
     Cliente completo para WhisperAPI (servidor externo de transcrição).
-    
+
     Endpoints suportados:
     - POST /transcribe: enviar áudio para transcrição
     - GET /status/:jobId: verificar status do job
@@ -697,8 +697,14 @@ class WhisperAPIClient:
     - GET /all-status: status de todos os jobs
     - GET /system-report: relatório do sistema
     - GET /model-info: informações do modelo
+
+    Integração com JobManager:
+    - Tracking persistente de jobs
+    - Health-aware Round Robin
+    - Backoff adaptativo
+    - Recovery automático de jobs pendentes
     """
-    
+
     def __init__(
         self,
         base_url: str = "http://127.0.0.1:3001",
@@ -708,37 +714,55 @@ class WhisperAPIClient:
         word_timestamps: bool = False,
         translate: bool = False,
         cleanup: bool = True,
+        use_job_manager: bool = True,
     ):
         """
-        Inicializa o cliente WhisperAPI com suporte a Round Robin.
-        
+        Inicializa o cliente WhisperAPI com suporte a Round Robin inteligente.
+
         Args:
             base_url: URL base primária (fallback)
             base_urls: Lista de URLs para balanceamento de carga
             language: Idioma padrão
             timeout: Timeout máximo
-            ...
+            word_timestamps: Incluir timestamps por palavra
+            translate: Traduzir para inglês
+            cleanup: Limpar arquivos temporários no servidor
+            use_job_manager: Usar JobManager para tracking inteligente
         """
         # Configurar URLs
         self.urls = base_urls or [base_url]
         self.urls = [u.rstrip("/") for u in self.urls if u and u.strip()]
         if not self.urls:
             self.urls = ["http://127.0.0.1:3001"]
-            
-        self.base_url = self.urls[0] # Compatibilidade
-        
+
+        self.base_url = self.urls[0]  # Compatibilidade
+
         self.language = language
         self.timeout = timeout
         self.word_timestamps = word_timestamps
         self.translate = translate
         self.cleanup = cleanup
-        
+        self.use_job_manager = use_job_manager
+
         # Gerenciamento de clientes (Round Robin)
-        self._clients = {} # Cache: url -> httpx.Client
+        self._clients = {}  # Cache: url -> httpx.Client
         self._current_index = 0
         self._lock = threading.Lock()
-        
-        self._http_client = None # Legado
+
+        self._http_client = None  # Legado
+
+        # JobManager para tracking inteligente
+        self._job_manager = None
+        if use_job_manager:
+            try:
+                from .job_manager import get_job_manager
+                self._job_manager = get_job_manager()
+                self._job_manager.register_servers(self.urls)
+                logger.info(f"🧠 JobManager integrado com {len(self.urls)} servidores")
+            except Exception as e:
+                logger.warning(f"JobManager não disponível: {e}")
+                self._job_manager = None
+
         logger.info(f"🌐 WhisperAPI inicializado com {len(self.urls)} servidores: {self.urls}")
     
     def _get_client_for_url(self, url: str):
@@ -753,11 +777,29 @@ class WhisperAPIClient:
             return self._clients[url]
             
     def _get_next_client(self):
-        """Retorna (client, url) usando Round Robin."""
+        """
+        Retorna (client, url) usando Round Robin inteligente.
+
+        Se JobManager está disponível, usa seleção baseada em:
+        - Saúde do servidor
+        - Tamanho da fila
+        - Workers disponíveis
+        """
+        # Se JobManager disponível, usar seleção inteligente
+        if self._job_manager:
+            url = self._job_manager.get_next_server()
+            if url:
+                client = self._get_client_for_url(url)
+                return client, url
+
+            # Fallback: tentar qualquer servidor se nenhum "saudável"
+            logger.warning("Nenhum servidor saudável, tentando fallback...")
+
+        # Round Robin simples (fallback)
         with self._lock:
             url = self.urls[self._current_index]
             self._current_index = (self._current_index + 1) % len(self.urls)
-        
+
         client = self._get_client_for_url(url)
         return client, url
 
@@ -1022,16 +1064,18 @@ class WhisperAPIClient:
         poll_interval: float = 3.0,
         max_wait_time: Optional[float] = None,
         server_url: Optional[str] = None,
+        local_job_id: Optional[str] = None,
     ) -> dict:
         """
-        Aguarda conclusão de um job de transcrição com polling.
-        
+        Aguarda conclusão de um job de transcrição com polling adaptativo.
+
         Args:
-            job_id: ID do job
-            poll_interval: Intervalo entre verificações (segundos)
+            job_id: ID do job no servidor remoto
+            poll_interval: Intervalo inicial entre verificações (segundos)
             max_wait_time: Tempo máximo de espera (padrão: 30 minutos)
-            server_url: URL do servidor (necessário se usar Round Robin)
-            
+            server_url: URL do servidor (necessário para Round Robin)
+            local_job_id: ID do job local no JobManager
+
         Returns:
             Dict com resultado completo da transcrição
         """
@@ -1039,63 +1083,119 @@ class WhisperAPIClient:
         start_time = time.time()
         last_status = ""
         not_found_retries = 0
-        max_not_found_retries = 10  # Aumentado para 10 retries se job inconsistente
-        
-        logger.info(f"⏳ Aguardando conclusão do job {job_id} em {server_url or 'default'}... (timeout: {max_wait}s)")
-        
+        max_not_found_retries = 15  # Aumentado para dar mais tempo ao servidor
+
+        # Calcular intervalo adaptativo baseado na carga do servidor
+        if self._job_manager and server_url:
+            poll_interval = self._job_manager.calculate_poll_interval(server_url)
+            logger.debug(f"Polling adaptativo: {poll_interval:.1f}s para {server_url}")
+
+        logger.info(
+            f"⏳ Aguardando job {job_id[:8]}... em {server_url or 'default'} "
+            f"(poll: {poll_interval:.1f}s, timeout: {max_wait}s)"
+        )
+
         while (time.time() - start_time) < max_wait:
             try:
                 status_data = self.get_job_status(job_id, server_url=server_url)
                 status = status_data.get('status', '')
                 not_found_retries = 0  # Reset contador se encontrou o job
-                
+
+                # Atualizar estado no JobManager
+                if self._job_manager and local_job_id:
+                    if status == 'processing':
+                        self._job_manager.mark_job_processing(local_job_id)
+
                 if status != last_status:
-                    logger.info(f"📊 Job status: {status}")
+                    elapsed = time.time() - start_time
+                    logger.info(f"📊 Job status: {status} ({elapsed:.1f}s)")
                     last_status = status
-                
+
                 if status == 'completed':
                     result = status_data.get('result', {})
                     text = result.get('text', '')[:100]
+                    processing_time = time.time() - start_time
+
+                    # Marcar sucesso no JobManager
+                    if self._job_manager:
+                        if server_url:
+                            self._job_manager.mark_server_success(server_url)
+                        if local_job_id:
+                            metadata = result.get('metadata', {})
+                            self._job_manager.mark_job_completed(
+                                local_job_id,
+                                text=result.get('text', ''),
+                                language=metadata.get('language', self.language),
+                                duration=metadata.get('duration', 0),
+                                processing_time=processing_time,
+                            )
+
                     logger.info(f"✅ Transcrição concluída! Texto: {text}...")
                     return status_data
-                
+
                 if status == 'failed':
                     error = status_data.get('error', 'Erro desconhecido')
+
+                    # Marcar falha no JobManager
+                    if self._job_manager and local_job_id:
+                        self._job_manager.mark_job_failed(local_job_id, error)
+
                     raise RuntimeError(f"Transcrição falhou: {error}")
-                
+
                 # Esperar antes de próxima verificação
                 time.sleep(poll_interval)
-                
-                # Aumentar intervalo progressivamente (até 8s)
-                poll_interval = min(poll_interval * 1.3, 8.0)
-                
+
+                # Aumentar intervalo progressivamente (até 10s)
+                # Mas recalcular baseado na carga se JobManager disponível
+                if self._job_manager and server_url:
+                    poll_interval = self._job_manager.calculate_poll_interval(server_url)
+                else:
+                    poll_interval = min(poll_interval * 1.2, 10.0)
+
             except ValueError as e:
-                # Job não encontrado - pode ser temporário ou já expirou
+                # Job não encontrado - pode ser temporário (race condition) ou já expirou
                 not_found_retries += 1
                 server_msg = f" em {server_url}" if server_url else ""
-                
+
                 if not_found_retries <= max_not_found_retries:
+                    # Aumentar delay exponencialmente: 2s, 4s, 6s, 8s...
+                    wait_time = min(2.0 * not_found_retries, 10.0)
                     logger.warning(
-                        f"⚠️ Job não encontrado{server_msg} (tentativa {not_found_retries}/{max_not_found_retries}), aguardando..."
+                        f"⚠️ Job não encontrado{server_msg} "
+                        f"(tentativa {not_found_retries}/{max_not_found_retries}), "
+                        f"aguardando {wait_time:.1f}s..."
                     )
+                    time.sleep(wait_time)
                 else:
-                    logger.error(f"❌ Job {job_id} perdido{server_msg} após {max_not_found_retries} tentativas.")
+                    logger.error(
+                        f"❌ Job {job_id} perdido{server_msg} "
+                        f"após {max_not_found_retries} tentativas."
+                    )
+                    # Marcar falha no JobManager
+                    if self._job_manager and local_job_id:
+                        self._job_manager.mark_job_failed(
+                            local_job_id,
+                            f"Job perdido após {max_not_found_retries} tentativas",
+                            can_retry=True,
+                        )
                     raise
-                
-                if not_found_retries > max_not_found_retries:
-                    logger.error(f"❌ Job {job_id} não encontrado após {not_found_retries} tentativas")
-                    raise e
-                
-                logger.warning(f"⚠️ Job não encontrado (tentativa {not_found_retries}/{max_not_found_retries}), aguardando...")
-                time.sleep(poll_interval * 2)  # Esperar mais tempo antes de tentar novamente
-                
+
             except RuntimeError as e:
                 raise e
             except Exception as e:
                 logger.warning(f"⚠️ Erro no polling: {e}")
                 time.sleep(poll_interval)
-        
+
         elapsed = time.time() - start_time
+
+        # Marcar timeout no JobManager
+        if self._job_manager and local_job_id:
+            self._job_manager.mark_job_failed(
+                local_job_id,
+                f"Timeout após {elapsed:.1f}s",
+                can_retry=True,
+            )
+
         raise TimeoutError(f"Timeout após {elapsed:.1f}s aguardando conclusão do job {job_id}")
     
     def transcribe(
@@ -1107,19 +1207,25 @@ class WhisperAPIClient:
     ) -> TranscriptionResult:
         """
         Transcreve áudio usando WhisperAPI (método completo bloqueante).
-        
+
+        Com JobManager integrado:
+        - Tracking persistente do job
+        - Retry automático em caso de falha
+        - Seleção inteligente de servidor
+
         Args:
             audio: AudioBuffer, numpy array, ou caminho do arquivo
             language: Idioma ('pt', 'en', 'auto', etc.)
             translate: Se True, traduz para inglês
             word_timestamps: Se True, inclui timestamps por palavra
-            
+
         Returns:
             TranscriptionResult com texto, idioma, duração, etc.
         """
         start_time = time.time()
         language = language or self.language
-        
+        local_job_id = None
+
         # Preparar arquivo de áudio
         if isinstance(audio, str):
             audio_path = audio
@@ -1134,8 +1240,17 @@ class WhisperAPIClient:
             cleanup_file = True
         else:
             raise TypeError(f"Tipo de áudio não suportado: {type(audio)}")
-        
+
         try:
+            # 0. Criar job local no JobManager (para tracking)
+            if self._job_manager:
+                local_job = self._job_manager.create_job(
+                    audio_path=audio_path,
+                    language=language,
+                )
+                local_job_id = local_job.id
+                logger.debug(f"Job local criado: {local_job_id[:8]}")
+
             # 1. Upload do áudio
             upload_result = self.upload_audio(
                 audio_path,
@@ -1143,17 +1258,30 @@ class WhisperAPIClient:
                 translate=translate,
                 word_timestamps=word_timestamps,
             )
-            
-            job_id = upload_result.get('jobId')
+
+            remote_job_id = upload_result.get('jobId')
             server_url = upload_result.get('server_url')
-            if not job_id:
+
+            if not remote_job_id:
                 raise RuntimeError("WhisperAPI não retornou jobId")
-            
-            # Pequeno delay para evitar race condition no servidor (job created vs job queryable)
-            time.sleep(1.0)
-            
-            # 2. Aguardar conclusão
-            result = self.wait_for_completion(job_id, server_url=server_url)
+
+            # Registrar job no JobManager
+            if self._job_manager and local_job_id:
+                self._job_manager.mark_job_submitted(
+                    local_job_id,
+                    server_url=server_url,
+                    remote_job_id=remote_job_id,
+                )
+
+            # Pequeno delay para evitar race condition (job criado vs queryable)
+            time.sleep(1.5)
+
+            # 2. Aguardar conclusão com polling adaptativo
+            result = self.wait_for_completion(
+                remote_job_id,
+                server_url=server_url,
+                local_job_id=local_job_id,
+            )
             
             # 3. Extrair resultado
             result_data = result.get('result', {})
@@ -1189,19 +1317,107 @@ class WhisperAPIClient:
     def _save_audio(self, audio: np.ndarray, path: str) -> None:
         """Salva array numpy como WAV (16kHz, mono, 16-bit)."""
         import wave
-        
+
         if audio.dtype != np.int16:
             if audio.dtype in (np.float32, np.float64):
                 audio = (audio * 32767).astype(np.int16)
             else:
                 audio = audio.astype(np.int16)
-        
+
         with wave.open(path, 'wb') as wav:
             wav.setnchannels(1)
             wav.setsampwidth(2)
             wav.setframerate(16000)
             wav.writeframes(audio.tobytes())
-    
+
+    # =========================================================================
+    # JobManager API - Métodos para gerenciamento inteligente de jobs
+    # =========================================================================
+
+    def get_job_manager_stats(self) -> dict:
+        """
+        Retorna estatísticas do JobManager.
+
+        Returns:
+            Dict com estatísticas de jobs e servidores
+        """
+        if not self._job_manager:
+            return {"error": "JobManager não disponível"}
+
+        return self._job_manager.stats
+
+    def get_server_status(self) -> List[dict]:
+        """
+        Retorna status de todos os servidores registrados.
+
+        Returns:
+            Lista de dicts com status de cada servidor
+        """
+        if not self._job_manager:
+            return []
+
+        return self._job_manager.server_status
+
+    def get_pending_jobs(self) -> List[dict]:
+        """
+        Retorna lista de jobs pendentes de processamento.
+
+        Returns:
+            Lista de jobs pendentes ou aguardando retry
+        """
+        if not self._job_manager:
+            return []
+
+        jobs = self._job_manager.get_pending_jobs()
+        return [job.to_dict() for job in jobs]
+
+    def get_in_progress_jobs(self) -> List[dict]:
+        """
+        Retorna lista de jobs em andamento.
+
+        Returns:
+            Lista de jobs sendo processados
+        """
+        if not self._job_manager:
+            return []
+
+        jobs = self._job_manager.get_in_progress_jobs()
+        return [job.to_dict() for job in jobs]
+
+    def retry_failed_jobs(self) -> int:
+        """
+        Processa jobs pendentes de retry.
+
+        Returns:
+            Número de jobs reprocessados
+        """
+        if not self._job_manager:
+            return 0
+
+        pending = self._job_manager.get_pending_jobs()
+        retried = 0
+
+        for job in pending:
+            if job.state == "retrying" and os.path.exists(job.audio_path):
+                try:
+                    logger.info(f"🔄 Retrying job {job.id[:8]}...")
+                    self.transcribe(job.audio_path, language=job.language)
+                    retried += 1
+                except Exception as e:
+                    logger.error(f"Retry falhou para {job.id[:8]}: {e}")
+
+        return retried
+
+    def cleanup_old_jobs(self, max_age_hours: int = 24):
+        """
+        Remove jobs antigos completados ou falhos.
+
+        Args:
+            max_age_hours: Idade máxima em horas
+        """
+        if self._job_manager:
+            self._job_manager.cleanup_old_jobs(max_age_hours)
+
     def close(self):
         """Fecha conexões HTTP."""
         if self._http_client:

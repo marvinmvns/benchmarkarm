@@ -3,6 +3,11 @@ Processador em Lote de Transcrições.
 
 Processa arquivos .wav pendentes, transcreve com Whisper,
 salva como .txt e remove os arquivos de áudio originais.
+
+Integração com JobManager:
+- Tracking persistente de jobs
+- Retry automático de jobs falhos
+- Recuperação de jobs pendentes no restart
 """
 
 import logging
@@ -12,7 +17,10 @@ import time
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
-from typing import List, Optional, Callable
+from typing import List, Optional, Callable, TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from ..transcription.job_manager import JobManager
 
 logger = logging.getLogger(__name__)
 
@@ -51,15 +59,20 @@ class TranscriptionFile:
 class BatchProcessor:
     """
     Processador em lote de arquivos de áudio.
-    
+
     Funcionalidades:
     - Escaneia diretório por arquivos .wav pendentes
     - Transcreve com Whisper
     - Salva resultado como .txt com metadados
     - Remove .wav após sucesso
     - Executa periodicamente ou quando CPU está baixo
+
+    Integração com JobManager:
+    - Retry automático de jobs falhos
+    - Recuperação de jobs pendentes no restart
+    - Monitoramento de saúde dos servidores WhisperAPI
     """
-    
+
     def __init__(
         self,
         audio_dir: str = "~/audio-recordings",
@@ -67,36 +80,50 @@ class BatchProcessor:
         max_files_per_run: int = 10,
         cpu_threshold: float = 30.0,
         config_path: Optional[str] = None,
+        use_job_manager: bool = True,
     ):
         """
         Inicializa o processador.
-        
+
         Args:
             audio_dir: Diretório com arquivos de áudio
             interval_minutes: Intervalo entre execuções (minutos)
             max_files_per_run: Máximo de arquivos por execução
             cpu_threshold: Processar se CPU abaixo deste % (além do intervalo)
             config_path: Caminho do arquivo de configuração
+            use_job_manager: Usar JobManager para tracking inteligente
         """
         self.audio_dir = Path(os.path.expanduser(audio_dir))
         self.interval_minutes = interval_minutes
         self.max_files_per_run = max_files_per_run
         self.cpu_threshold = cpu_threshold
         self.config_path = config_path
-        
+        self.use_job_manager = use_job_manager
+
         # Estado
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._stats = ProcessingStats()
         self._failed_files: List[str] = []
-        
+
         # Componentes (lazy loaded)
         self._transcriber = None
-        
+        self._job_manager: Optional["JobManager"] = None
+
         # Callbacks
         self._on_file_processed: Optional[Callable] = None
         self._on_error: Optional[Callable] = None
-        
+
+        # Inicializar JobManager se habilitado
+        if use_job_manager:
+            try:
+                from ..transcription.job_manager import get_job_manager
+                self._job_manager = get_job_manager()
+                logger.info("🧠 BatchProcessor integrado com JobManager")
+            except Exception as e:
+                logger.warning(f"JobManager não disponível: {e}")
+                self._job_manager = None
+
         logger.info(f"BatchProcessor inicializado: dir={self.audio_dir}")
     
     def _get_transcriber(self):
@@ -422,7 +449,8 @@ class BatchProcessor:
     def _run_loop(self) -> None:
         """Loop principal de processamento."""
         check_interval = 30  # Verificar a cada 30 segundos
-        
+        retry_check_counter = 0
+
         while self._running:
             try:
                 # Atualizar próxima execução
@@ -431,26 +459,146 @@ class BatchProcessor:
                         self._stats.last_run.timestamp() + self.interval_minutes * 60
                     )
                     self._stats.next_run = next_run
-                
-                # Verificar se deve processar
+
+                # Verificar se deve processar arquivos pendentes
                 if self._should_process():
                     self.process_pending()
-                
+
                 # Atualizar contagem de pendentes
                 self._stats.pending_files = len(self.get_pending_files())
-                
+
+                # Verificar jobs pendentes de retry a cada 5 ciclos (2.5 min)
+                retry_check_counter += 1
+                if retry_check_counter >= 5:
+                    retry_check_counter = 0
+                    self._process_pending_retries()
+
             except Exception as e:
                 logger.error(f"Erro no loop de processamento: {e}")
-            
+
             # Aguardar
             time.sleep(check_interval)
+
+    def _process_pending_retries(self) -> int:
+        """
+        Processa jobs pendentes de retry do JobManager.
+
+        Returns:
+            Número de jobs reprocessados
+        """
+        if not self._job_manager:
+            return 0
+
+        try:
+            pending_jobs = self._job_manager.get_pending_jobs()
+            retried = 0
+
+            for job in pending_jobs:
+                # Só processar jobs com estado "retrying" e arquivo existente
+                if job.state == "retrying":
+                    audio_path = Path(job.audio_path)
+
+                    if audio_path.exists():
+                        logger.info(f"🔄 Retry automático: {audio_path.name}")
+                        try:
+                            if self.process_file(audio_path):
+                                retried += 1
+                        except Exception as e:
+                            logger.error(f"Retry falhou para {audio_path.name}: {e}")
+                    else:
+                        # Arquivo não existe mais, marcar como falho permanentemente
+                        self._job_manager.mark_job_failed(
+                            job.id,
+                            f"Arquivo não encontrado: {job.audio_path}",
+                            can_retry=False,
+                        )
+
+            if retried > 0:
+                logger.info(f"✅ {retried} jobs reprocessados com sucesso")
+
+            return retried
+
+        except Exception as e:
+            logger.error(f"Erro ao processar retries: {e}")
+            return 0
+
+    def recover_pending_jobs(self) -> int:
+        """
+        Recupera jobs pendentes do JobManager após restart.
+
+        Verifica jobs que estavam "submitted" ou "processing" e
+        re-submete se o arquivo ainda existe.
+
+        Returns:
+            Número de jobs recuperados
+        """
+        if not self._job_manager:
+            return 0
+
+        try:
+            in_progress = self._job_manager.get_in_progress_jobs()
+            recovered = 0
+
+            for job in in_progress:
+                audio_path = Path(job.audio_path)
+
+                if audio_path.exists():
+                    logger.info(f"🔄 Recuperando job: {audio_path.name}")
+
+                    # Marcar como retrying para reprocessar
+                    self._job_manager.mark_job_failed(
+                        job.id,
+                        "Recuperado após restart",
+                        can_retry=True,
+                    )
+                    recovered += 1
+                else:
+                    # Arquivo não existe, marcar como falho
+                    self._job_manager.mark_job_failed(
+                        job.id,
+                        f"Arquivo não encontrado após restart: {job.audio_path}",
+                        can_retry=False,
+                    )
+
+            if recovered > 0:
+                logger.info(f"📋 {recovered} jobs marcados para retry após restart")
+
+            return recovered
+
+        except Exception as e:
+            logger.error(f"Erro ao recuperar jobs: {e}")
+            return 0
+
+    def get_job_manager_stats(self) -> dict:
+        """
+        Retorna estatísticas do JobManager.
+
+        Returns:
+            Dict com estatísticas ou mensagem de erro
+        """
+        if not self._job_manager:
+            return {"error": "JobManager não disponível"}
+
+        return self._job_manager.stats
+
+    def get_server_status(self) -> List[dict]:
+        """
+        Retorna status dos servidores WhisperAPI.
+
+        Returns:
+            Lista com status de cada servidor
+        """
+        if not self._job_manager:
+            return []
+
+        return self._job_manager.server_status
     
     @property
     def status(self) -> dict:
-        """Retorna status atual do processador."""
+        """Retorna status atual do processador com informações do JobManager."""
         self._stats.pending_files = len(self.get_pending_files())
-        
-        return {
+
+        status_dict = {
             "running": self._running,
             "is_processing": self._stats.is_running,
             "pending_files": self._stats.pending_files,
@@ -463,6 +611,24 @@ class BatchProcessor:
             "cpu_threshold": self.cpu_threshold,
             "audio_dir": str(self.audio_dir),
         }
+
+        # Adicionar estatísticas do JobManager se disponível
+        if self._job_manager:
+            job_stats = self._job_manager.stats
+            status_dict["job_manager"] = {
+                "enabled": True,
+                "total_jobs": job_stats.get("total_jobs", 0),
+                "completed_jobs": job_stats.get("completed_jobs", 0),
+                "failed_jobs": job_stats.get("failed_jobs", 0),
+                "pending_jobs": job_stats.get("pending_jobs", 0),
+                "in_progress_jobs": job_stats.get("in_progress_jobs", 0),
+                "healthy_servers": job_stats.get("healthy_servers", 0),
+                "total_servers": job_stats.get("total_servers", 0),
+            }
+        else:
+            status_dict["job_manager"] = {"enabled": False}
+
+        return status_dict
 
 
 # Instância global
