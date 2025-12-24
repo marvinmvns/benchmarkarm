@@ -982,7 +982,7 @@ class WhisperAPIClient:
     def get_completed_jobs(self) -> list:
         """
         Obtém lista de jobs concluídos.
-        
+
         Returns:
             Lista de jobs completados
         """
@@ -994,7 +994,56 @@ class WhisperAPIClient:
         except Exception as e:
             logger.warning(f"Erro ao obter jobs concluídos: {e}")
             return []
-    
+
+    def _try_recover_from_completed_jobs(
+        self, job_id: str, server_url: Optional[str] = None
+    ) -> Optional[dict]:
+        """
+        Tenta recuperar resultado de um job que pode ter completado mas não está
+        mais acessível via /status/:id.
+
+        Args:
+            job_id: ID do job a recuperar
+            server_url: URL do servidor
+
+        Returns:
+            Dict com resultado se encontrado, None caso contrário
+        """
+        try:
+            if server_url:
+                client = self._get_client_for_url(server_url)
+            else:
+                client = self._get_client()
+
+            response = client.get("/completed-jobs", timeout=10.0)
+            if response.status_code != 200:
+                return None
+
+            jobs = response.json().get("jobs", [])
+
+            # Procurar job pelo ID (pode ser parcial)
+            for job in jobs:
+                remote_id = job.get("jobId", "") or job.get("id", "")
+                if job_id in remote_id or remote_id in job_id:
+                    logger.info(f"🔍 Job {job_id[:8]} encontrado em /completed-jobs")
+
+                    # Formatar como resultado do /status
+                    return {
+                        "status": "completed",
+                        "result": {
+                            "text": job.get("text", ""),
+                            "metadata": job.get("metadata", {}),
+                            "segments": job.get("segments"),
+                            "processingTime": job.get("processingTime", 0),
+                        },
+                    }
+
+            return None
+
+        except Exception as e:
+            logger.debug(f"Erro ao recuperar de /completed-jobs: {e}")
+            return None
+
     # ==========================================================================
     # Transcription
     # ==========================================================================
@@ -1111,6 +1160,11 @@ class WhisperAPIClient:
                     logger.info(f"📊 Job status: {status} ({elapsed:.1f}s)")
                     last_status = status
 
+                    # Quando o job está processando, usar polling mais rápido
+                    # para não perder a janela de conclusão
+                    if status == 'processing':
+                        poll_interval = 1.5  # Polling agressivo durante processamento
+
                 if status == 'completed':
                     result = status_data.get('result', {})
                     text = result.get('text', '')[:100]
@@ -1153,9 +1207,37 @@ class WhisperAPIClient:
                     poll_interval = min(poll_interval * 1.2, 10.0)
 
             except ValueError as e:
-                # Job não encontrado - pode ser temporário (race condition) ou já expirou
+                # Job não encontrado - tentar recuperar de /completed-jobs
                 not_found_retries += 1
                 server_msg = f" em {server_url}" if server_url else ""
+
+                # Tentar recuperar resultado de /completed-jobs (o job pode ter completado e sido limpo)
+                if not_found_retries <= 3:  # Tentar recuperação nas primeiras tentativas
+                    try:
+                        recovered_result = self._try_recover_from_completed_jobs(
+                            job_id, server_url
+                        )
+                        if recovered_result:
+                            # Marcar sucesso no JobManager
+                            if self._job_manager:
+                                if server_url:
+                                    self._job_manager.mark_server_success(server_url)
+                                if local_job_id:
+                                    result_data = recovered_result.get('result', {})
+                                    metadata = result_data.get('metadata', {})
+                                    processing_time = time.time() - start_time
+                                    self._job_manager.mark_job_completed(
+                                        local_job_id,
+                                        text=result_data.get('text', ''),
+                                        language=metadata.get('language', self.language),
+                                        duration=metadata.get('duration', 0),
+                                        processing_time=processing_time,
+                                    )
+
+                            logger.info(f"✅ Job recuperado de /completed-jobs!")
+                            return recovered_result
+                    except Exception as recovery_error:
+                        logger.debug(f"Recuperação falhou: {recovery_error}")
 
                 if not_found_retries <= max_not_found_retries:
                     # Aumentar delay exponencialmente: 2s, 4s, 6s, 8s...
