@@ -1202,12 +1202,12 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             processor = get_batch_processor()
             if processor:
                 # Listar todos os arquivos TXT
-                transcriptions = processor.list_transcriptions()
+                transcriptions = processor.get_transcription_files()
                 deleted_count = 0
                 errors = []
                 
                 for t in transcriptions:
-                    filename = t.get('filename', '')
+                    filename = t.name
                     if filename.endswith('.txt'):
                         try:
                             if processor.delete_transcription(filename):
