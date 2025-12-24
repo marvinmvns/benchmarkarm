@@ -753,8 +753,27 @@ class WhisperAPIClient:
             response = client.get("/health")
             response.raise_for_status()
             data = response.json()
-            logger.info(f"✅ WhisperAPI online: {data.get('status', 'ok')}")
-            return data
+            
+            # Validar se é realmente um WhisperAPI
+            # WhisperAPI deve retornar availableEndpoints ou campos específicos
+            if "availableEndpoints" in data or "whisper" in str(data).lower():
+                logger.info(f"✅ WhisperAPI online: {data.get('status', 'ok')}")
+                return data
+            elif "whatsapp" in str(data).lower():
+                # Usuário apontou para um servidor de WhatsApp, não WhisperAPI
+                return {
+                    "status": "invalid",
+                    "error": "Este servidor é um bot de WhatsApp, não um WhisperAPI. Verifique a URL."
+                }
+            else:
+                # Servidor respondeu mas não parece ser WhisperAPI
+                logger.warning(f"Servidor respondeu mas não parece ser WhisperAPI: {data}")
+                return {
+                    "status": "unknown",
+                    "message": "Servidor respondeu, mas pode não ser WhisperAPI",
+                    "raw_response": data
+                }
+                
         except Exception as e:
             logger.error(f"❌ WhisperAPI não responde: {e}")
             return {"status": "offline", "error": str(e)}

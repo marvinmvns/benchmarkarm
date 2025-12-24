@@ -1159,12 +1159,27 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             try:
                 # Health check
                 health = client.health_check()
-                if health.get("status") == "offline":
+                status = health.get("status")
+                
+                if status == "offline":
                     return jsonify({
+                        "success": False,
                         "error": f"WhisperAPI offline: {health.get('error', 'não responde')}"
                     }), 503
+                elif status == "invalid":
+                    return jsonify({
+                        "success": False,
+                        "error": health.get('error', 'Servidor inválido')
+                    }), 400
+                elif status == "unknown":
+                    return jsonify({
+                        "success": True,
+                        "warning": True,
+                        "message": health.get('message', 'Servidor respondeu, mas verificar se é WhisperAPI'),
+                        "health": health,
+                    })
                 
-                # Obter informações adicionais
+                # Servidor válido - obter informações adicionais
                 formats = client.get_supported_formats()
                 queue_stats = client.get_queue_stats()
                 model_info = client.get_model_info()
