@@ -119,8 +119,7 @@ async function saveConfig() {
 }
 
 function populateForm(cfg) {
-    // Mode
-    if (cfg.mode) $('#mode').value = cfg.mode;
+    // Mode removed - system uses provider settings directly
 
     // System
     if (cfg.system) {
@@ -847,7 +846,6 @@ async function loadTranscriptionHistory() {
 
         if (result.success) {
             renderHistory(result.transcriptions);
-            $('#proc-total').textContent = result.total || 0;
         }
     } catch (error) {
         console.error('Erro ao carregar histórico:', error);
@@ -929,10 +927,10 @@ async function uploadAudioFile() {
 }
 
 async function updateProcessorStatus(result) {
+    // Use updateConfigStatus instead - processor status elements were removed
     if (result && result.config) {
-        $('#proc-mode').textContent = result.config.mode || '-';
-        $('#proc-whisper').textContent = result.config.whisper_model || '-';
-        $('#proc-llm').textContent = result.config.llm_provider || '-';
+        // Config display is now handled by updateConfigStatus
+        updateConfigStatus(result.config);
     }
 }
 
