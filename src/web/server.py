@@ -314,8 +314,42 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
 
     @app.route("/api/restart", methods=["POST"])
     def restart_service():
-        """Reinicia o serviço (placeholder)."""
-        return jsonify({"success": True, "message": "Reinício solicitado"})
+        """Reinicia o serviço (recarrega configurações)."""
+        try:
+            import subprocess
+            import sys
+            
+            logger.info("🔄 Reinício solicitado via interface web")
+            
+            # Reiniciar em background após resposta
+            def delayed_restart():
+                import time
+                time.sleep(1)
+                logger.info("🔄 Reiniciando aplicação...")
+                # Executar script de restart
+                project_root = Path(app.config["CONFIG_PATH"]).parent.parent
+                restart_script = project_root / "run.sh"
+                if restart_script.exists():
+                    subprocess.Popen(
+                        [str(restart_script), "restart"],
+                        cwd=str(project_root),
+                        start_new_session=True,
+                    )
+                else:
+                    # Fallback: reiniciar via python
+                    os.execv(sys.executable, [sys.executable] + sys.argv)
+            
+            # Iniciar restart em thread separada
+            restart_thread = threading.Thread(target=delayed_restart, daemon=True)
+            restart_thread.start()
+            
+            return jsonify({
+                "success": True, 
+                "message": "Reinício em andamento. A página será recarregada em 5 segundos..."
+            })
+        except Exception as e:
+            logger.error(f"Erro ao reiniciar: {e}")
+            return jsonify({"error": str(e)}), 500
 
     @app.route("/api/test/audio", methods=["POST"])
     def test_audio():

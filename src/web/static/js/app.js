@@ -408,6 +408,21 @@ function initEventListeners() {
     // Save button
     $('#btn-save').addEventListener('click', saveConfig);
 
+    // Save and Restart button
+    $('#btn-save-restart').addEventListener('click', async () => {
+        await saveConfig();
+        showToast('Reiniciando aplicação...', 'info');
+        try {
+            await apiPost('restart');
+            // Recarregar página após 5 segundos
+            setTimeout(() => {
+                window.location.reload();
+            }, 5000);
+        } catch (error) {
+            console.error('Erro ao reiniciar:', error);
+        }
+    });
+
     // Reload button
     $('#btn-reload').addEventListener('click', loadConfig);
 
