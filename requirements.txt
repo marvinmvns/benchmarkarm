@@ -36,8 +36,8 @@ cachetools>=5.3.0
 flask>=3.0.0
 
 # Opcional: GPIO para LEDs do ReSpeaker
-# RPi.GPIO>=0.7.1
-# spidev>=3.6
+RPi.GPIO>=0.7.1
+spidev>=3.6
 
 # Opcional: Faster Whisper (mais rápido que whisper original)
 # faster-whisper>=0.10.0

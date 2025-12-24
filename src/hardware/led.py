@@ -247,6 +247,31 @@ class LEDController:
                 self.idle()
         
         threading.Thread(target=reset, daemon=True).start()
+
+    def flash_random(self, duration: float = 0.5):
+        """Pisca uma cor aleatória."""
+        if not self.enabled: return
+        
+        self._current_state = 'flash'
+        self._stop_animation()
+        
+        import random
+        # Cores aleatórias vivas (R, G, B) - evitando preto
+        r = random.randint(0, 255)
+        g = random.randint(0, 255)
+        b = random.randint(0, 255)
+        # Garantir brilho mínimo
+        if r + g + b < 200:
+             r = max(r, 100)
+             
+        self._set_color((r, g, b))
+        
+        def reset():
+            time.sleep(duration)
+            if self._current_state == 'flash':
+                self.idle()
+        
+        threading.Thread(target=reset, daemon=True).start()
     
     def error(self, duration: float = 1.0):
         """Erro - Vermelho por alguns segundos."""

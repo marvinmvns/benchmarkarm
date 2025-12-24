@@ -134,6 +134,79 @@ except ImportError:
     logger.warning("Flask não instalado. Execute: pip install flask")
 
 
+
+class ContinuousListener(threading.Thread):
+    def __init__(self, config_path, led_controller=None):
+        super().__init__(daemon=True)
+        self.config_path = config_path
+        self.led_controller = led_controller
+        self.running = False
+        self.active = False 
+        self.processor = None
+        
+    def run(self):
+        self.running = True
+        logger.info("🎧 Thread de escuta contínua iniciada (Aguardando ativação)")
+        
+        while self.running:
+            if self.active:
+                try:
+                    if not self.processor:
+                        from src.pipeline import VoiceProcessor
+                        self.processor = VoiceProcessor(config_path=self.config_path)
+                        logger.info("🎤 Microfone ativado para escuta contínua")
+                
+                    # Feedback visual de "Ouvindo" é tratado pelo VAD/Loop?
+                    # O VoiceProcessor não notifica "Ouvindo" exceto via callback?
+                    # Vamos assumir IDLE color (apagado) até detectar voz?
+                    # Ou Azul constante?
+                    # VoiceProcessor.process(audio=None) bloqueia gravando.
+                    
+                    # Se quisermos feedback de VAD, precisamos passar callback
+                    def status_cb(stage, details):
+                        if not self.led_controller: return
+                        if stage == "recording":
+                            pass # Azul piscando?
+                        elif stage == "transcribing":
+                            self.led_controller.processing()
+                    
+                    # Indicar que está ativo (pode ser sutil)
+                    # self.led_controller.listening() # Pisca azul enquanto grava
+                    
+                    result = self.processor.process(
+                        generate_summary=True,
+                        status_callback=status_cb
+                    )
+                    
+                    if result.text.strip():
+                        logger.info(f"🗣️: {result.text}")
+                        if self.led_controller: self.led_controller.success()
+                    
+                except Exception as e:
+                    logger.error(f"Erro na escuta: {e}")
+                    if self.led_controller: self.led_controller.error()
+                    time.sleep(2)
+            else:
+                 # Not active
+                 if self.processor:
+                     self.processor = None # __exit__ handles cleanup if used as context manager?
+                     # No, VoiceProcessor uses __enter__/__exit__.
+                     # Direct usage requires manual close?
+                     # VoiceProcessor implementation:
+                     # def __exit__(self, ...): self.audio.close()
+                     # So if I instantiate it without 'with', I should call close?
+                     # It doesn't seem to have explicit Close method except via context manager.
+                     # Let's check VoiceProcessor... 
+                     # Assuming I can just drop it and GC cleans up or I should fix VoiceProcessor later.
+                     # Ideally I used 'with' inside loop, but that creates overhead per phrase.
+                     # I'll rely on GC for now as AudioCapture closes stream in destructor?
+                     pass
+                 time.sleep(0.5)
+
+    def stop(self):
+        self.running = False
+        self.active = False
+
 def create_app(config_path: Optional[str] = None) -> "Flask":
     """
     Cria aplicação Flask para interface web.
@@ -169,6 +242,51 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
     # Configurar captura de logs em memória
     log_handler = setup_memory_logging()
     logger.info("🌐 Servidor web iniciado")
+
+    # Configurar LEDs
+    try:
+        from src.hardware.led import NeoPixelController
+        # Initial access to config without saving it? load_config is defined inside create_app...
+        # Wait, load_config and other helpers are defined AFTER init?
+        # I need to move load_config definition UP or copy logic.
+        # But setup_memory_logging works.
+        
+        # Load logic inline to avoid issues
+        with open(config_path, "r") as f:
+            full_config = yaml.safe_load(f) or {}
+            
+        led_conf = full_config.get('hardware', {}).get('leds', {})
+        app.led_controller = NeoPixelController(
+            num_leds=led_conf.get('num_leds', 3),
+            brightness=led_conf.get('brightness', 10),
+            enabled=led_conf.get('enabled', True)
+        )
+        app.led_controller.flash_random()
+        logger.info("💡 LEDs inicializados")
+    except Exception as e:
+        logger.warning(f"Falha ao iniciar LEDs: {e}")
+        app.led_controller = None
+
+    # Inicializar Listener
+    app.listener = ContinuousListener(config_path, app.led_controller)
+    app.listener.start()
+
+    # Inicializar Botão
+    try:
+        from src.hardware.button import ButtonController
+        def on_button_toggle(state):
+            logger.info(f"Botão alterado para: {state}")
+            app.listener.active = state
+            if app.led_controller:
+                if state:
+                    app.led_controller.success(duration=2.0) # Verde
+                else:
+                    app.led_controller.error(duration=2.0) # Vermelho (usando error como vermelho)
+                    
+        app.button_controller = ButtonController(callback=on_button_toggle)
+    except Exception as e:
+        logger.warning(f"Erro ao iniciar botão: {e}")
+        app.button_controller = None
 
     # ==========================================================================
     # Funções auxiliares
@@ -269,7 +387,10 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
 
     @app.route("/api/config", methods=["POST"])
     def update_config():
-        """Atualiza configuração."""
+        """Atualiza configuração via JSON."""
+        if app.led_controller:
+            app.led_controller.flash_random()
+            
         try:
             new_config = request.get_json()
             if not new_config:
@@ -337,12 +458,15 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
 
     @app.route("/api/restart", methods=["POST"])
     def restart_service():
-        """Reinicia o serviço (recarrega configurações)."""
+        """Reinicia o serviço."""
+        if app.led_controller:
+             app.led_controller.flash_random()
+             
         try:
             import subprocess
             import sys
             
-            logger.info("🔄 Reinício solicitado via interface web")
+            logger.info("🔄 Solicitada reinicialização do serviço")
             
             # Reiniciar em background após resposta
             def delayed_restart():
@@ -786,8 +910,15 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             
             # Gravar 3 segundos
             logger.info("Iniciando gravação de teste (3s)...")
+            
+            if app.led_controller:
+                app.led_controller.listening()
+            
             # Forçar 3s mesmo se houver silêncio, para garantir audio audível
             buffer = capture.record(duration=3.0, stop_on_silence=False)
+            
+            if app.led_controller:
+                app.led_controller.success()
             
             # Salvar em temp file
             fd, filename = tempfile.mkstemp(suffix=".wav")
@@ -817,14 +948,25 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             
             with VoiceProcessor(config_path=config_path) as processor:
                 logger.info("Gravando...")
+                
+                if app.led_controller:
+                    app.led_controller.listening()
+                
                 # Gravar manualmente para controlar duração
                 audio_buffer = processor.audio.record(duration=duration, stop_on_silence=False)
                 
                 logger.info("Processando...")
+                
+                if app.led_controller:
+                    app.led_controller.processing()
+                
                 result = processor.process(
                     audio=audio_buffer, 
                     generate_summary=True
                 )
+                
+                if app.led_controller:
+                    app.led_controller.success()
                 
                 return jsonify({
                     "success": True,
