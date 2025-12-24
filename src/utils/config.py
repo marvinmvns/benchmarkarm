@@ -102,6 +102,17 @@ class OllamaConfig:
 
 
 @dataclass
+class ChatMockConfig:
+    """Configuração do ChatMock (API compatível OpenAI local)."""
+    base_url: str = "http://127.0.0.1:8000/v1"
+    model: str = "gpt-5"
+    max_tokens: int = 500
+    temperature: float = 0.3
+    reasoning_effort: str = "medium"  # minimal, low, medium, high, xhigh
+    enable_web_search: bool = False
+
+
+@dataclass
 class LLMConfig:
     """Configuração completa do LLM."""
     provider: str = "local"
@@ -109,6 +120,7 @@ class LLMConfig:
     openai: OpenAIConfig = field(default_factory=OpenAIConfig)
     anthropic: AnthropicConfig = field(default_factory=AnthropicConfig)
     ollama: OllamaConfig = field(default_factory=OllamaConfig)
+    chatmock: ChatMockConfig = field(default_factory=ChatMockConfig)
 
 
 @dataclass

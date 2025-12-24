@@ -170,6 +170,15 @@ function populateForm(cfg) {
             $('#llm_temperature').value = cfg.llm.local.temperature || 0.3;
             $('#llm_temperature_value').textContent = cfg.llm.local.temperature || 0.3;
         }
+
+        // ChatMock config
+        if (cfg.llm.chatmock) {
+            $('#chatmock_base_url').value = cfg.llm.chatmock.base_url || 'http://127.0.0.1:8000/v1';
+            $('#chatmock_model').value = cfg.llm.chatmock.model || 'gpt-5';
+            $('#chatmock_reasoning').value = cfg.llm.chatmock.reasoning_effort || 'medium';
+            $('#chatmock_max_tokens').value = cfg.llm.chatmock.max_tokens || 500;
+            $('#chatmock_web_search').checked = cfg.llm.chatmock.enable_web_search === true;
+        }
     }
 
     // Offline Queue
@@ -258,6 +267,14 @@ function collectFormValues() {
     config.llm.local.max_tokens = parseInt($('#local_max_tokens').value);
     config.llm.local.temperature = parseFloat($('#llm_temperature').value);
 
+    // ChatMock config
+    if (!config.llm.chatmock) config.llm.chatmock = {};
+    config.llm.chatmock.base_url = $('#chatmock_base_url').value;
+    config.llm.chatmock.model = $('#chatmock_model').value;
+    config.llm.chatmock.reasoning_effort = $('#chatmock_reasoning').value;
+    config.llm.chatmock.max_tokens = parseInt($('#chatmock_max_tokens').value);
+    config.llm.chatmock.enable_web_search = $('#chatmock_web_search').checked;
+
     // Offline Queue
     if (!config.offline_queue) config.offline_queue = {};
     config.offline_queue.enabled = $('#offline_enabled').checked;
@@ -312,13 +329,20 @@ function updateStatus(status) {
 function updateLLMSection(provider) {
     const localConfig = $('#llm-local-config');
     const apiConfig = $('#llm-api-config');
+    const chatmockConfig = $('#llm-chatmock-config');
 
+    // Esconder todas as seções primeiro
+    if (localConfig) localConfig.style.display = 'none';
+    if (apiConfig) apiConfig.style.display = 'none';
+    if (chatmockConfig) chatmockConfig.style.display = 'none';
+
+    // Mostrar seção apropriada
     if (provider === 'local') {
-        localConfig.style.display = 'block';
-        apiConfig.style.display = 'none';
+        if (localConfig) localConfig.style.display = 'block';
+    } else if (provider === 'chatmock') {
+        if (chatmockConfig) chatmockConfig.style.display = 'block';
     } else {
-        localConfig.style.display = 'none';
-        apiConfig.style.display = 'block';
+        if (apiConfig) apiConfig.style.display = 'block';
     }
 }
 

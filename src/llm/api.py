@@ -342,6 +342,149 @@ class OllamaProvider(LLMProvider):
             return False
 
 
+class ChatMockProvider(LLMProvider):
+    """
+    Provedor ChatMock (API compatível OpenAI local).
+    
+    Suporta servidores como ChatMock que emulam a API OpenAI.
+    Modelos suportados: gpt-5, gpt-5.1, gpt-5.2, gpt-5-codex, etc.
+    """
+
+    def __init__(
+        self,
+        model: str = "gpt-5",
+        max_tokens: int = 500,
+        temperature: float = 0.3,
+        base_url: str = "http://127.0.0.1:8000/v1",
+        reasoning_effort: str = "medium",
+        enable_web_search: bool = False,
+    ):
+        """
+        Inicializa provedor ChatMock.
+
+        Args:
+            model: Modelo (gpt-5, gpt-5.1, gpt-5.2, gpt-5-codex, etc.)
+            max_tokens: Tokens máximos
+            temperature: Temperatura
+            base_url: URL base do servidor (ex: http://192.168.1.100:8000/v1)
+            reasoning_effort: Esforço de raciocínio (minimal, low, medium, high, xhigh)
+            enable_web_search: Habilitar busca web
+        """
+        super().__init__(model, max_tokens, temperature)
+        self.base_url = base_url.rstrip("/")
+        self.reasoning_effort = reasoning_effort
+        self.enable_web_search = enable_web_search
+        self._client = None
+
+    @property
+    def provider_name(self) -> str:
+        return "chatmock"
+
+    def _get_client(self):
+        """Retorna cliente OpenAI configurado para ChatMock."""
+        if self._client is None:
+            try:
+                from openai import OpenAI
+                self._client = OpenAI(
+                    base_url=self.base_url,
+                    api_key="key"  # ChatMock ignora a API key
+                )
+            except ImportError:
+                raise ImportError(
+                    "openai não instalado. Execute: pip install openai"
+                )
+        return self._client
+
+    def generate(self, prompt: str, **kwargs) -> LLMResponse:
+        """Gera resposta usando ChatMock API."""
+        start_time = time.time()
+        client = self._get_client()
+
+        max_tokens = kwargs.get("max_tokens", self.max_tokens)
+        temperature = kwargs.get("temperature", self.temperature)
+
+        try:
+            # Construir mensagens
+            messages = [
+                {
+                    "role": "system",
+                    "content": "Você é um assistente útil que responde em português de forma concisa."
+                },
+                {"role": "user", "content": prompt}
+            ]
+
+            # Configurar parâmetros extras
+            extra_params = {}
+            
+            # Adicionar web search se habilitado
+            if self.enable_web_search:
+                extra_params["responses_tools"] = [{"type": "web_search"}]
+                extra_params["responses_tool_choice"] = "auto"
+
+            response = client.chat.completions.create(
+                model=self.model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                **extra_params
+            )
+
+            processing_time = time.time() - start_time
+            message = response.choices[0].message.content
+
+            # Calcular tokens (ChatMock pode não retornar usage)
+            tokens_input = getattr(response.usage, 'prompt_tokens', 0) if response.usage else 0
+            tokens_output = getattr(response.usage, 'completion_tokens', 0) if response.usage else 0
+
+            return LLMResponse(
+                text=message.strip() if message else "",
+                model=self.model,
+                provider=self.provider_name,
+                tokens_input=tokens_input,
+                tokens_output=tokens_output,
+                processing_time=processing_time,
+            )
+
+        except Exception as e:
+            logger.error(f"Erro ChatMock: {e}")
+            raise
+
+    def stream(self, prompt: str, **kwargs) -> Generator[str, None, None]:
+        """Gera resposta em streaming."""
+        client = self._get_client()
+        max_tokens = kwargs.get("max_tokens", self.max_tokens)
+        temperature = kwargs.get("temperature", self.temperature)
+
+        stream = client.chat.completions.create(
+            model=self.model,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "Você é um assistente útil que responde em português de forma concisa."
+                },
+                {"role": "user", "content": prompt}
+            ],
+            max_tokens=max_tokens,
+            temperature=temperature,
+            stream=True,
+        )
+
+        for chunk in stream:
+            if chunk.choices[0].delta.content:
+                yield chunk.choices[0].delta.content
+
+    def is_available(self) -> bool:
+        """Verifica se ChatMock está disponível."""
+        import httpx
+
+        try:
+            # Tentar acessar /v1/models
+            response = httpx.get(f"{self.base_url}/models", timeout=5)
+            return response.status_code == 200
+        except Exception:
+            return False
+
+
 def get_provider(
     provider: str,
     model: Optional[str] = None,
@@ -351,7 +494,7 @@ def get_provider(
     Factory function para criar provedores.
 
     Args:
-        provider: Nome do provedor (local, openai, anthropic, ollama)
+        provider: Nome do provedor (local, openai, anthropic, ollama, chatmock)
         model: Modelo (opcional, usa padrão do provedor)
         **kwargs: Argumentos adicionais
 
@@ -363,6 +506,7 @@ def get_provider(
         "openai": OpenAIProvider,
         "anthropic": AnthropicProvider,
         "ollama": OllamaProvider,
+        "chatmock": ChatMockProvider,
     }
 
     if provider not in providers:
