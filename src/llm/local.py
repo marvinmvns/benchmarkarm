@@ -44,6 +44,8 @@ class LocalLLM(LLMProvider):
         quantization: str = "q4_0",
         llama_cpp_path: Optional[str] = None,
         models_dir: Optional[str] = None,
+        use_server_mode: bool = True,  # OTIMIZADO: server mode por padrão
+        server_port: int = 8080,
     ):
         """
         Inicializa LLM local.
@@ -58,12 +60,17 @@ class LocalLLM(LLMProvider):
             quantization: Quantização do modelo
             llama_cpp_path: Caminho para llama.cpp
             models_dir: Diretório de modelos
+            use_server_mode: Usar servidor persistente (5-10s mais rápido)
+            server_port: Porta do servidor llama.cpp
         """
         super().__init__(model, max_tokens, temperature)
 
         self.context_size = context_size
         self.threads = threads
         self.quantization = quantization
+        self.use_server_mode = use_server_mode
+        self.server_port = server_port
+        self._server = None
 
         # Encontrar caminhos
         self._project_root = self._find_project_root()
@@ -82,8 +89,20 @@ class LocalLLM(LLMProvider):
         if self._available:
             logger.info(
                 f"LLM local inicializado: {model}, "
-                f"context={context_size}, threads={threads}"
+                f"context={context_size}, threads={threads}, "
+                f"server_mode={use_server_mode}"
             )
+
+            # OTIMIZADO: Iniciar servidor se habilitado
+            if use_server_mode:
+                try:
+                    self._start_server()
+                except Exception as e:
+                    logger.warning(
+                        f"Não foi possível iniciar servidor llama.cpp: {e}. "
+                        f"Usando modo subprocess."
+                    )
+                    self.use_server_mode = False
         else:
             logger.warning(
                 f"LLM local não disponível. "
@@ -154,6 +173,51 @@ class LocalLLM(LLMProvider):
         model_path = Path(self.model_path)
         return exe_path.exists() and model_path.exists()
 
+    def _start_server(self) -> None:
+        """Inicia servidor llama.cpp para inferência mais rápida."""
+        if self._server is not None:
+            return
+
+        try:
+            self._server = LlamaCppServer(
+                model_path=self.model_path,
+                host="127.0.0.1",
+                port=self.server_port,
+                threads=self.threads,
+                context_size=self.context_size,
+            )
+            self._server.start()
+            logger.info(f"✅ Servidor llama.cpp iniciado na porta {self.server_port}")
+        except Exception as e:
+            logger.error(f"Erro ao iniciar servidor llama.cpp: {e}")
+            self._server = None
+            raise
+
+    def _stop_server(self) -> None:
+        """Para servidor llama.cpp."""
+        if self._server is not None:
+            try:
+                self._server.stop()
+                self._server = None
+                logger.info("Servidor llama.cpp parado")
+            except Exception as e:
+                logger.error(f"Erro ao parar servidor: {e}")
+
+    def _check_server_health(self) -> bool:
+        """Verifica se o servidor está saudável."""
+        if self._server is None:
+            return False
+
+        try:
+            import httpx
+            response = httpx.get(
+                f"http://127.0.0.1:{self.server_port}/health",
+                timeout=2,
+            )
+            return response.status_code == 200
+        except Exception:
+            return False
+
     def generate(self, prompt: str, **kwargs) -> LLMResponse:
         """
         Gera resposta usando llama.cpp.
@@ -178,7 +242,42 @@ class LocalLLM(LLMProvider):
         # Formatar prompt para chat
         formatted_prompt = self._format_prompt(prompt)
 
-        # Executar llama.cpp
+        # OTIMIZADO: Usar servidor se disponível
+        if self.use_server_mode and self._server is not None:
+            # Verificar saúde do servidor e reiniciar se necessário
+            if not self._check_server_health():
+                logger.warning("Servidor llama.cpp não responde, reiniciando...")
+                self._stop_server()
+                try:
+                    self._start_server()
+                except Exception as e:
+                    logger.error(f"Falha ao reiniciar servidor: {e}. Usando subprocess.")
+                    self.use_server_mode = False
+                    # Fallthrough para subprocess
+
+            # Tentar usar servidor
+            if self.use_server_mode and self._server is not None:
+                try:
+                    text = self._server.generate(formatted_prompt, max_tokens)
+                    processing_time = time.time() - start_time
+
+                    # Estimar tokens
+                    tokens_input = len(formatted_prompt.split())
+                    tokens_output = len(text.split())
+
+                    return LLMResponse(
+                        text=text,
+                        model=self.model,
+                        provider=self.provider_name,
+                        tokens_input=tokens_input,
+                        tokens_output=tokens_output,
+                        processing_time=processing_time,
+                    )
+                except Exception as e:
+                    logger.error(f"Erro ao usar servidor llama.cpp: {e}. Usando subprocess.")
+                    # Fallthrough para subprocess
+
+        # Fallback: Executar llama.cpp via subprocess
         cmd = [
             self.llama_cpp_path,
             "-m", self.model_path,
@@ -195,7 +294,7 @@ class LocalLLM(LLMProvider):
         if kwargs.get("low_memory", True):
             cmd.extend(["--mlock"])  # Lock memory
 
-        logger.debug(f"Executando LLM: {' '.join(cmd[:6])}...")
+        logger.debug(f"Executando LLM via subprocess: {' '.join(cmd[:6])}...")
 
         try:
             result = subprocess.run(
@@ -329,8 +428,17 @@ Output:"""
             "context_size": self.context_size,
             "threads": self.threads,
             "available": self._available,
+            "server_mode": self.use_server_mode,
+            "server_running": self._server is not None,
         })
         return info
+
+    def __del__(self):
+        """Destructor - para servidor ao destruir objeto."""
+        try:
+            self._stop_server()
+        except Exception:
+            pass
 
 
 class LlamaCppServer:

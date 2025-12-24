@@ -17,6 +17,38 @@ import yaml
 
 logger = logging.getLogger(__name__)
 
+# OTIMIZADO: Semáforo para limitar processamentos concorrentes (previne OOM)
+# Máximo 2 processamentos simultâneos no Pi Zero 2W (512MB RAM)
+_processing_semaphore = threading.Semaphore(2)
+
+
+def require_processing_slot(f):
+    """
+    Decorator para limitar processamentos concorrentes.
+    Retorna 503 se todos os slots estiverem ocupados.
+    """
+    from functools import wraps
+
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        # Tentar adquirir slot sem bloquear
+        if not _processing_semaphore.acquire(blocking=False):
+            logger.warning("⚠️ Servidor ocupado - todos os slots de processamento em uso")
+            return jsonify({
+                "error": "Servidor ocupado processando outras requisições",
+                "message": "Tente novamente em alguns segundos",
+                "status": 503
+            }), 503
+
+        try:
+            # Executar função com slot adquirido
+            return f(*args, **kwargs)
+        finally:
+            # Sempre liberar slot
+            _processing_semaphore.release()
+
+    return decorated_function
+
 
 class MemoryLogHandler(logging.Handler):
     """Handler que armazena logs em memória para exibição na interface web."""
@@ -288,30 +320,17 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
     # Funções auxiliares
     # ==========================================================================
 
+    # OTIMIZADO: Usar ConfigManager para cache de configuração
+    from ..utils.config_manager import get_config_manager
+    config_manager = get_config_manager()
+
     def load_config() -> dict:
-        """Carrega configuração do arquivo YAML."""
-        try:
-            with open(app.config["CONFIG_PATH"], "r", encoding="utf-8") as f:
-                return yaml.safe_load(f) or {}
-        except FileNotFoundError:
-            return {}
+        """Carrega configuração do arquivo YAML (com cache)."""
+        return config_manager.load_config(app.config["CONFIG_PATH"])
 
     def save_config(config: dict) -> bool:
         """Salva configuração no arquivo YAML."""
-        try:
-            # Backup
-            config_path = Path(app.config["CONFIG_PATH"])
-            backup_path = config_path.with_suffix(".yaml.bak")
-            if config_path.exists():
-                import shutil
-                shutil.copy(config_path, backup_path)
-
-            with open(config_path, "w", encoding="utf-8") as f:
-                yaml.dump(config, f, default_flow_style=False, allow_unicode=True, sort_keys=False)
-            return True
-        except Exception as e:
-            logger.error(f"Erro ao salvar configuração: {e}")
-            return False
+        return config_manager.save_config(config, app.config["CONFIG_PATH"])
 
     def get_system_info() -> dict:
         """Retorna informações do sistema."""
@@ -380,6 +399,17 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         resp = jsonify(config)
         resp.headers['Cache-Control'] = 'no-store, no-cache, must-revalidate, max-age=0'
         return resp
+
+    @app.route("/api/config/cache/stats", methods=["GET"])
+    def get_config_cache_stats():
+        """Retorna estatísticas do cache de configuração (OTIMIZAÇÃO FASE 2)."""
+        return jsonify(config_manager.get_stats())
+
+    @app.route("/api/config/cache/clear", methods=["POST"])
+    def clear_config_cache():
+        """Limpa cache de configuração."""
+        config_manager.clear_cache()
+        return jsonify({"success": True, "message": "Cache limpo"})
 
     @app.route("/api/config", methods=["POST"])
     def update_config():
@@ -945,6 +975,7 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
                 app.listener.active = True
 
     @app.route("/api/test/live", methods=["POST"])
+    @require_processing_slot  # OTIMIZADO: Limita processamentos concorrentes
     def test_live_pipeline():
         """Teste de pipeline completo (Gravar -> Transcrever -> [LLM])."""
         was_active = False
@@ -1032,6 +1063,7 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             return jsonify({"error": str(e)}), 500
 
     @app.route("/api/test/llm", methods=["POST"])
+    @require_processing_slot  # OTIMIZADO: Limita processamentos concorrentes
     def test_llm_connection():
         """Testa conexão com LLM."""
         try:
@@ -1272,6 +1304,7 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         })
 
     @app.route("/api/transcribe", methods=["POST"])
+    @require_processing_slot  # OTIMIZADO: Limita processamentos concorrentes
     def transcribe_audio():
         """Recebe arquivo de áudio e retorna transcrição."""
         import time

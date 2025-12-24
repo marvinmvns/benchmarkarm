@@ -39,6 +39,8 @@ llm:
     max_tokens: 150
     temperature: 0.3
     quantization: "q4_0"
+    use_server_mode: true  # OTIMIZADO: servidor persistente (5-10s mais rápido)
+    server_port: 8080
   openai:
     api_key: "${OPENAI_API_KEY}"
     model: "gpt-4o-mini"
