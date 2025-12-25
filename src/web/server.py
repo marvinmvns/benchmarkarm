@@ -771,22 +771,63 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
 
     @app.route("/api/listener/segments", methods=["GET"])
     def listener_segments():
-        """Retorna segmentos transcritos pelo listener."""
+        """
+        Retorna segmentos transcritos pelo listener.
+
+        Query params:
+            limit: Número máximo de segmentos (default: 50)
+            filter: Filtro de status ('success', 'error', ou None para todos)
+            server: Filtrar por servidor (ex: 'whisper-121')
+        """
         try:
             listener = get_continuous_listener()
-            limit = request.args.get("limit", 20, type=int)
+            limit = request.args.get("limit", 50, type=int)
+            filter_status = request.args.get("filter")  # 'success' ou 'error'
+            server_filter = request.args.get("server")
+
             if listener:
-                segments = [s.to_dict() for s in listener.get_segments(limit)]
+                if server_filter:
+                    segments = [s.to_dict() for s in listener.get_segments_by_server(server_filter, limit)]
+                else:
+                    segments = [s.to_dict() for s in listener.get_segments(limit, filter_status=filter_status)]
+
                 return jsonify({
                     "success": True,
                     "segments": segments,
                     "total": len(segments),
+                    "filter": filter_status,
+                    "server": server_filter,
                 })
             else:
                 return jsonify({
                     "success": True,
                     "segments": [],
                     "total": 0,
+                })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/listener/stats", methods=["GET"])
+    def listener_stats():
+        """Retorna estatísticas dos segmentos (sucesso/erro, por servidor)."""
+        try:
+            listener = get_continuous_listener()
+            if listener:
+                stats = listener.get_segment_stats()
+                return jsonify({
+                    "success": True,
+                    "stats": stats,
+                })
+            else:
+                return jsonify({
+                    "success": True,
+                    "stats": {
+                        "total": 0,
+                        "success": 0,
+                        "errors": 0,
+                        "success_rate": 0,
+                        "by_server": {},
+                    },
                 })
         except Exception as e:
             return jsonify({"error": str(e)}), 500

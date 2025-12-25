@@ -31,12 +31,28 @@ class TranscriptionResult:
     processing_time: float
     model: str
     segments: list[dict] = None
+    server_url: Optional[str] = None  # Servidor que processou a transcrição
 
     @property
     def words_per_second(self) -> float:
         """Palavras por segundo de processamento."""
         words = len(self.text.split())
         return words / self.processing_time if self.processing_time > 0 else 0
+
+    @property
+    def server_name(self) -> str:
+        """Nome amigável do servidor (último octeto do IP)."""
+        if not self.server_url:
+            return "local"
+        try:
+            # Extrair IP do URL (ex: http://192.168.31.121:3001 -> 121)
+            import re
+            match = re.search(r'(\d+)\.(\d+)\.(\d+)\.(\d+)', self.server_url)
+            if match:
+                return f"whisper-{match.group(4)}"
+            return self.server_url
+        except Exception:
+            return self.server_url or "unknown"
 
     def to_dict(self) -> dict:
         """Converte para dicionário."""
@@ -47,6 +63,8 @@ class TranscriptionResult:
             "processing_time": self.processing_time,
             "model": self.model,
             "segments": self.segments,
+            "server_url": self.server_url,
+            "server_name": self.server_name,
         }
 
 
@@ -1370,12 +1388,13 @@ class WhisperAPIClient:
         word_timestamps: Optional[bool] = None,
     ) -> TranscriptionResult:
         """
-        Transcreve áudio usando WhisperAPI (método completo bloqueante).
+        Transcreve áudio usando WhisperAPI com failover inteligente.
 
-        Com JobManager integrado:
-        - Tracking persistente do job
-        - Retry automático em caso de falha
-        - Seleção inteligente de servidor
+        Características:
+        - Tenta automaticamente em outro servidor se um falhar
+        - Marca servidores problemáticos temporariamente
+        - Só falha completamente após tentar todos os servidores disponíveis
+        - Tracking persistente do job via JobManager
 
         Args:
             audio: AudioBuffer, numpy array, ou caminho do arquivo
@@ -1415,53 +1434,32 @@ class WhisperAPIClient:
                 local_job_id = local_job.id
                 logger.debug(f"Job local criado: {local_job_id[:8]}")
 
-            # 1. Upload do áudio
-            upload_result = self.upload_audio(
-                audio_path,
+            # Tentar transcrição com failover automático
+            result, successful_server = self._transcribe_with_failover(
+                audio_path=audio_path,
                 language=language,
                 translate=translate,
                 word_timestamps=word_timestamps,
-            )
-
-            remote_job_id = upload_result.get('jobId')
-            server_url = upload_result.get('server_url')
-
-            if not remote_job_id:
-                raise RuntimeError("WhisperAPI não retornou jobId")
-
-            # Registrar job no JobManager
-            if self._job_manager and local_job_id:
-                self._job_manager.mark_job_submitted(
-                    local_job_id,
-                    server_url=server_url,
-                    remote_job_id=remote_job_id,
-                )
-
-            # Pequeno delay para evitar race condition (job criado vs queryable)
-            time.sleep(1.5)
-
-            # 2. Aguardar conclusão com polling adaptativo
-            result = self.wait_for_completion(
-                remote_job_id,
-                server_url=server_url,
                 local_job_id=local_job_id,
             )
-            
-            # 3. Extrair resultado
+
+            # Extrair resultado
             result_data = result.get('result', {})
             text = result_data.get('text', '')
             metadata = result_data.get('metadata', {})
-            
+
             processing_time = time.time() - start_time
             server_processing_time = result_data.get('processingTime', processing_time)
-            
-            # Log resultado
+
+            # Log resultado com servidor
+            server_name = successful_server.split('/')[-1].replace(':3001', '') if successful_server else 'unknown'
             logger.info(
                 f"📝 Transcrição: {len(text)} chars, "
                 f"idioma: {metadata.get('language', language)}, "
-                f"tempo: {server_processing_time:.1f}s"
+                f"tempo: {server_processing_time:.1f}s, "
+                f"servidor: {server_name}"
             )
-            
+
             return TranscriptionResult(
                 text=text.strip(),
                 language=metadata.get('language', language),
@@ -1469,14 +1467,240 @@ class WhisperAPIClient:
                 processing_time=processing_time,
                 model="whisperapi",
                 segments=result_data.get('segments'),
+                server_url=successful_server,
             )
-            
+
         finally:
             if cleanup_file and os.path.exists(audio_path):
                 try:
                     os.unlink(audio_path)
                 except OSError:
                     pass
+
+    def _transcribe_with_failover(
+        self,
+        audio_path: str,
+        language: str,
+        translate: Optional[bool],
+        word_timestamps: Optional[bool],
+        local_job_id: Optional[str],
+    ) -> tuple:
+        """
+        Tenta transcrição com failover automático entre servidores.
+
+        Se um servidor falhar, marca-o como problemático e tenta outro.
+        Só falha completamente após tentar todos os servidores disponíveis.
+
+        Args:
+            audio_path: Caminho do arquivo de áudio
+            language: Idioma para transcrição
+            translate: Traduzir para inglês
+            word_timestamps: Incluir timestamps por palavra
+            local_job_id: ID do job local no JobManager
+
+        Returns:
+            Tuple (result_dict, server_url) com resultado da transcrição e servidor usado
+
+        Raises:
+            RuntimeError: Se todos os servidores falharem
+        """
+        tried_servers: set = set()
+        last_error = None
+        max_attempts = len(self.urls) * 2  # Permitir retry em cada servidor uma vez
+
+        for attempt in range(max_attempts):
+            # Selecionar servidor (evitando os que já falharam recentemente)
+            server_url = self._select_server_for_job(exclude_servers=tried_servers)
+
+            if not server_url:
+                # Todos os servidores foram tentados, verificar se podemos tentar novamente
+                if tried_servers:
+                    # Limpar lista e tentar novamente (segunda rodada)
+                    if attempt < len(self.urls):
+                        tried_servers.clear()
+                        server_url = self._select_server_for_job(exclude_servers=tried_servers)
+
+                if not server_url:
+                    break
+
+            try:
+                logger.info(
+                    f"🔄 Tentativa {attempt + 1}/{max_attempts} em {server_url} "
+                    f"(excluídos: {len(tried_servers)} servidores)"
+                )
+
+                # Upload para o servidor específico
+                upload_result = self._upload_to_server(
+                    audio_path=audio_path,
+                    server_url=server_url,
+                    language=language,
+                    translate=translate,
+                    word_timestamps=word_timestamps,
+                )
+
+                remote_job_id = upload_result.get('jobId')
+                if not remote_job_id:
+                    raise RuntimeError("WhisperAPI não retornou jobId")
+
+                # Registrar job no JobManager
+                if self._job_manager and local_job_id:
+                    self._job_manager.mark_job_submitted(
+                        local_job_id,
+                        server_url=server_url,
+                        remote_job_id=remote_job_id,
+                    )
+
+                # Pequeno delay para evitar race condition
+                time.sleep(1.5)
+
+                # Aguardar conclusão
+                result = self.wait_for_completion(
+                    remote_job_id,
+                    server_url=server_url,
+                    local_job_id=local_job_id,
+                )
+
+                # Sucesso! Marcar servidor como saudável
+                if self._job_manager:
+                    self._job_manager.mark_server_success(server_url)
+
+                logger.info(f"✅ Transcrição bem-sucedida em {server_url}")
+                return result, server_url
+
+            except Exception as e:
+                error_msg = str(e)
+                last_error = e
+                tried_servers.add(server_url)
+
+                # Marcar servidor como problemático
+                if self._job_manager:
+                    self._job_manager.mark_server_failure(server_url, error_msg)
+
+                # Log do erro
+                remaining_servers = len(self.urls) - len(tried_servers)
+                logger.warning(
+                    f"⚠️ Servidor {server_url} falhou: {error_msg[:100]}... "
+                    f"({remaining_servers} servidores restantes)"
+                )
+
+                # Se ainda há servidores para tentar, continua
+                if remaining_servers > 0 or attempt < max_attempts - 1:
+                    continue
+
+        # Todos os servidores falharam
+        if self._job_manager and local_job_id:
+            self._job_manager.mark_job_failed(
+                local_job_id,
+                f"Todos os {len(self.urls)} servidores falharam",
+                can_retry=False,
+            )
+
+        raise RuntimeError(
+            f"Transcrição falhou em todos os {len(self.urls)} servidores. "
+            f"Último erro: {last_error}"
+        )
+
+    def _select_server_for_job(self, exclude_servers: set = None) -> Optional[str]:
+        """
+        Seleciona o melhor servidor disponível, excluindo os problemáticos.
+
+        Args:
+            exclude_servers: Conjunto de URLs de servidores a evitar
+
+        Returns:
+            URL do servidor selecionado ou None se nenhum disponível
+        """
+        exclude_servers = exclude_servers or set()
+
+        # Se JobManager disponível, usar seleção inteligente
+        if self._job_manager:
+            # Obter servidores saudáveis
+            healthy_servers = self._job_manager.get_healthy_servers()
+
+            # Filtrar os excluídos
+            available = [s for s in healthy_servers if s not in exclude_servers]
+
+            if available:
+                # Usar o melhor servidor disponível
+                return self._job_manager.get_next_server()
+
+            # Se não há servidores saudáveis, tentar qualquer um não excluído
+            all_available = [s for s in self.urls if s not in exclude_servers]
+            if all_available:
+                return all_available[0]
+
+            return None
+
+        # Fallback: Round Robin simples
+        available = [s for s in self.urls if s not in exclude_servers]
+        if available:
+            with self._lock:
+                server = available[self._current_index % len(available)]
+                self._current_index += 1
+                return server
+
+        return None
+
+    def _upload_to_server(
+        self,
+        audio_path: str,
+        server_url: str,
+        language: str,
+        translate: Optional[bool],
+        word_timestamps: Optional[bool],
+    ) -> dict:
+        """
+        Envia áudio para um servidor específico.
+
+        Args:
+            audio_path: Caminho do arquivo de áudio
+            server_url: URL do servidor de destino
+            language: Idioma para transcrição
+            translate: Traduzir para inglês
+            word_timestamps: Incluir timestamps por palavra
+
+        Returns:
+            Dict com jobId e outras informações
+        """
+        if not os.path.exists(audio_path):
+            raise FileNotFoundError(f"Arquivo não encontrado: {audio_path}")
+
+        translate = translate if translate is not None else self.translate
+        word_timestamps = word_timestamps if word_timestamps is not None else self.word_timestamps
+
+        try:
+            client = self._get_client_for_url(server_url)
+
+            with open(audio_path, 'rb') as f:
+                files = {'audio': (Path(audio_path).name, f, 'audio/wav')}
+                data = {
+                    'language': language,
+                    'translate': str(translate).lower(),
+                    'wordTimestamps': str(word_timestamps).lower(),
+                    'cleanup': str(self.cleanup).lower(),
+                }
+
+                logger.info(f"📤 Enviando áudio para {server_url}: {Path(audio_path).name}")
+
+                response = client.post(
+                    "/transcribe",
+                    files=files,
+                    data=data,
+                    timeout=30.0,
+                )
+                response.raise_for_status()
+                result = response.json()
+
+            job_id = result.get('jobId')
+            logger.info(f"✅ Upload OK! Job ID: {job_id} em {server_url}")
+
+            result['server_url'] = server_url
+            return result
+
+        except Exception as e:
+            error_msg = str(e)
+            logger.error(f"❌ Erro no upload para {server_url}: {error_msg}")
+            raise RuntimeError(f"Upload falhou em {server_url}: {error_msg}")
     
     def _save_audio(self, audio: np.ndarray, path: str) -> None:
         """Salva array numpy como WAV (16kHz, mono, 16-bit)."""

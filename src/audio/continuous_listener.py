@@ -32,6 +32,11 @@ class TranscriptionSegment:
     summary: Optional[str] = None
     audio_file: Optional[str] = None
     processing_time: float = 0.0
+    server_url: Optional[str] = None  # Servidor WhisperAPI que processou
+    server_name: Optional[str] = None  # Nome amigável do servidor
+    success: bool = True  # Se a transcrição foi bem-sucedida
+    retry_count: int = 0  # Número de tentativas até sucesso
+    error_message: Optional[str] = None  # Mensagem de erro se falhou
 
     def to_dict(self) -> dict:
         return {
@@ -41,6 +46,11 @@ class TranscriptionSegment:
             "summary": self.summary,
             "audio_file": self.audio_file,
             "processing_time": self.processing_time,
+            "server_url": self.server_url,
+            "server_name": self.server_name,
+            "success": self.success,
+            "retry_count": self.retry_count,
+            "error_message": self.error_message,
         }
 
 
@@ -229,15 +239,15 @@ class ContinuousListener:
         """Processa um segmento de áudio."""
         start_time = time.time()
         timestamp = datetime.now()
-        
+
         logger.info(f"📝 Processando áudio: {audio.duration:.1f}s")
-        
+
         # Nome do arquivo para salvar
         filename = f"audio_{timestamp.strftime('%Y%m%d_%H%M%S')}.wav"
         audio_file_path = str(self._save_dir / filename)
-        
+
         # Sempre salvar áudio primeiro (para garantir que não se perca)
-        # Será removido pelo batch_processor após transcrição bem sucedida
+        # Será removido após transcrição bem sucedida
         audio_file = None
         try:
             audio.save(audio_file_path)
@@ -245,20 +255,31 @@ class ContinuousListener:
             logger.debug(f"Áudio salvo: {audio_file}")
         except Exception as e:
             logger.error(f"Erro ao salvar áudio: {e}")
-        
+
         # Transcrever
         text = ""
         summary = None
         transcription_success = False
-        
+        server_url = None
+        server_name = None
+        error_message = None
+
         if self.usb_config.auto_transcribe:
             try:
                 processor = self._get_processor()
                 transcription = processor.transcribe(audio)
                 text = transcription.text
                 transcription_success = True
-                logger.info(f"✅ Transcrição: {text[:100]}..." if len(text) > 100 else f"✅ Transcrição: {text}")
-                
+
+                # Extrair informações do servidor
+                server_url = getattr(transcription, 'server_url', None)
+                server_name = getattr(transcription, 'server_name', None)
+
+                logger.info(
+                    f"✅ Transcrição ({server_name or 'local'}): "
+                    f"{text[:100]}..." if len(text) > 100 else f"✅ Transcrição ({server_name or 'local'}): {text}"
+                )
+
                 # Gerar resumo (opcional - não falha processamento se der erro)
                 if self.usb_config.auto_summarize and text.strip() and processor.llm:
                     try:
@@ -268,25 +289,26 @@ class ContinuousListener:
                     except Exception as e:
                         logger.warning(f"⚠️ Erro ao gerar resumo (sem internet ou LLM indisponível): {e}")
                         # Continua sem resumo - transcrição já foi salva
-                
-                # Transcrição bem sucedida - remover .wav se não precisar manter
-                if transcription_success and audio_file and not self.usb_config.keep_original_audio:
+
+                # SEMPRE remover .wav após transcrição bem sucedida (arquivos são grandes)
+                if transcription_success and audio_file:
                     try:
                         Path(audio_file).unlink()
+                        logger.debug(f"🗑️ Áudio removido após transcrição bem-sucedida: {filename}")
                         audio_file = None
-                        logger.debug("Áudio temporário removido após transcrição")
-                    except Exception:
-                        pass
-                
+                    except Exception as cleanup_error:
+                        logger.warning(f"Erro ao remover áudio: {cleanup_error}")
+
             except Exception as e:
                 logger.error(f"❌ Erro na transcrição: {e}")
+                error_message = str(e)
                 text = f"[Erro na transcrição: {e}]"
                 # Áudio permanece salvo para processamento posterior pelo batch_processor
                 logger.info("📂 Áudio mantido para reprocessamento posterior")
-        
+
         processing_time = time.time() - start_time
-        
-        # Criar segmento
+
+        # Criar segmento com todas as informações
         segment = TranscriptionSegment(
             timestamp=timestamp,
             audio_duration=audio.duration,
@@ -294,11 +316,15 @@ class ContinuousListener:
             summary=summary,
             audio_file=audio_file,
             processing_time=processing_time,
+            server_url=server_url,
+            server_name=server_name,
+            success=transcription_success,
+            error_message=error_message,
         )
-        
+
         # Armazenar e notificar
         self._segments.append(segment)
-        
+
         # Salvar no banco de dados persistente
         try:
             from ..utils.transcription_store import get_transcription_store, TranscriptionRecord
@@ -311,26 +337,86 @@ class ContinuousListener:
                 summary=summary,
                 audio_file=audio_file,
                 language=self.config.whisper.language or "pt",
-                processed_by=self.config.whisper.provider or "local",
+                processed_by=server_name or self.config.whisper.provider or "local",
             )
             store.save(record)
             logger.debug(f"Transcrição salva no banco: {record.id}")
         except Exception as e:
             logger.warning(f"Erro ao salvar transcrição no banco: {e}")
-        
+
         # Limitar histórico em memória
         if len(self._segments) > 100:
             self._segments = self._segments[-50:]
-        
+
         # Callback
         if self._on_transcription:
             self._on_transcription(segment)
-        
-        logger.info(f"✅ Processamento concluído em {processing_time:.1f}s")
 
-    def get_segments(self, limit: int = 20) -> List[TranscriptionSegment]:
-        """Retorna os últimos segmentos transcritos."""
-        return self._segments[-limit:]
+        status_emoji = "✅" if transcription_success else "❌"
+        logger.info(f"{status_emoji} Processamento concluído em {processing_time:.1f}s")
+
+    def get_segments(
+        self,
+        limit: int = 20,
+        filter_status: Optional[str] = None,
+    ) -> List[TranscriptionSegment]:
+        """
+        Retorna os últimos segmentos transcritos.
+
+        Args:
+            limit: Número máximo de segmentos a retornar
+            filter_status: Filtro de status ('success', 'error', ou None para todos)
+
+        Returns:
+            Lista de segmentos filtrados
+        """
+        segments = self._segments
+
+        if filter_status == 'success':
+            segments = [s for s in segments if s.success]
+        elif filter_status == 'error':
+            segments = [s for s in segments if not s.success]
+
+        return segments[-limit:]
+
+    def get_segments_by_server(self, server_name: str, limit: int = 20) -> List[TranscriptionSegment]:
+        """
+        Retorna segmentos processados por um servidor específico.
+
+        Args:
+            server_name: Nome do servidor (ex: 'whisper-121')
+            limit: Número máximo de segmentos
+
+        Returns:
+            Lista de segmentos do servidor
+        """
+        segments = [s for s in self._segments if s.server_name == server_name]
+        return segments[-limit:]
+
+    def get_segment_stats(self) -> dict:
+        """
+        Retorna estatísticas dos segmentos.
+
+        Returns:
+            Dict com contagens de sucesso/erro e por servidor
+        """
+        total = len(self._segments)
+        success = sum(1 for s in self._segments if s.success)
+        errors = total - success
+
+        # Contar por servidor
+        server_counts = {}
+        for seg in self._segments:
+            server = seg.server_name or 'unknown'
+            server_counts[server] = server_counts.get(server, 0) + 1
+
+        return {
+            "total": total,
+            "success": success,
+            "errors": errors,
+            "success_rate": (success / total * 100) if total > 0 else 0,
+            "by_server": server_counts,
+        }
 
     def clear_segments(self) -> None:
         """Limpa o histórico de segmentos."""
