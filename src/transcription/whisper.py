@@ -938,27 +938,66 @@ class WhisperAPIClient:
     def get_job_status(self, job_id: str, server_url: Optional[str] = None) -> dict:
         """
         Verifica status de um job específico.
-        
+
         Args:
             job_id: ID do job retornado por transcribe()
             server_url: URL do servidor (necessário se usar Round Robin)
-            
+
         Returns:
             Dict com status ('pending', 'processing', 'completed', 'failed'),
             result (se completed), error (se failed)
+
+        Raises:
+            ValueError: Job não encontrado (pode ser race condition)
+            RuntimeError: Job falhou com erro (não tentar novamente)
         """
         try:
             if server_url:
                 client = self._get_client_for_url(server_url)
             else:
                 client = self._get_client()
-                
+
             response = client.get(f"/status/{job_id}", timeout=10.0)
+
+            # Verificar resposta mesmo em caso de 404
             if response.status_code == 404:
+                try:
+                    error_data = response.json()
+                    error_msg = error_data.get("error", "")
+                    error_code = error_data.get("code", "")
+
+                    # Se há mensagem de erro real, o job falhou durante processamento
+                    # Não é um "job não encontrado", é um "job falhou"
+                    if error_msg and "transcription failed" in error_msg.lower():
+                        logger.error(f"❌ Job {job_id[:8]} falhou durante processamento: {error_msg}")
+                        return {
+                            "status": "failed",
+                            "error": error_msg,
+                            "code": error_code,
+                        }
+
+                    # Se é JOB_NOT_FOUND sem erro real, pode ser race condition
+                    if error_code == "JOB_NOT_FOUND" and not error_msg:
+                        raise ValueError(f"Job não encontrado: {job_id}")
+
+                    # Outro erro com mensagem
+                    if error_msg:
+                        return {
+                            "status": "failed",
+                            "error": error_msg,
+                        }
+
+                except json.JSONDecodeError:
+                    pass
+
+                # 404 sem corpo interpretável
                 raise ValueError(f"Job não encontrado: {job_id}")
+
             response.raise_for_status()
             return response.json()
         except ValueError:
+            raise
+        except RuntimeError:
             raise
         except Exception as e:
             raise RuntimeError(f"Erro ao verificar status: {e}")
@@ -1002,6 +1041,9 @@ class WhisperAPIClient:
         Tenta recuperar resultado de um job que pode ter completado mas não está
         mais acessível via /status/:id.
 
+        O servidor pode ter removido o job do endpoint /status/ após conclusão,
+        mas mantém registro em /completed-jobs.
+
         Args:
             job_id: ID do job a recuperar
             server_url: URL do servidor
@@ -1019,22 +1061,51 @@ class WhisperAPIClient:
             if response.status_code != 200:
                 return None
 
-            jobs = response.json().get("jobs", [])
+            data = response.json()
+            # Handle both formats: {"jobs": [...]} and {"completedJobs": [...]}
+            jobs = data.get("jobs", []) or data.get("completedJobs", [])
 
-            # Procurar job pelo ID (pode ser parcial)
+            # Procurar job pelo ID (pode ser parcial ou em campos diferentes)
             for job in jobs:
-                remote_id = job.get("jobId", "") or job.get("id", "")
-                if job_id in remote_id or remote_id in job_id:
+                # Diferentes campos possíveis para o ID
+                remote_id = (
+                    job.get("jobId", "")
+                    or job.get("id", "")
+                    or job.get("job_id", "")
+                )
+
+                # Match exato ou parcial (primeiro 8 caracteres)
+                if (job_id == remote_id
+                    or job_id in remote_id
+                    or remote_id in job_id
+                    or job_id[:8] == remote_id[:8] if len(remote_id) >= 8 else False):
+
                     logger.info(f"🔍 Job {job_id[:8]} encontrado em /completed-jobs")
+
+                    # O job pode ter resultado aninhado ou direto
+                    result_data = job.get("result", job)
+
+                    # Extrair texto (pode estar em diferentes lugares)
+                    text = (
+                        result_data.get("text", "")
+                        or job.get("text", "")
+                        or (result_data.get("result", {}).get("text", "") if isinstance(result_data.get("result"), dict) else "")
+                    )
+
+                    # Extrair metadata
+                    metadata = result_data.get("metadata", {}) or job.get("metadata", {})
 
                     # Formatar como resultado do /status
                     return {
-                        "status": "completed",
+                        "status": job.get("status", "completed"),
                         "result": {
-                            "text": job.get("text", ""),
-                            "metadata": job.get("metadata", {}),
-                            "segments": job.get("segments"),
-                            "processingTime": job.get("processingTime", 0),
+                            "text": text,
+                            "metadata": metadata,
+                            "segments": result_data.get("segments") or job.get("segments"),
+                            "processingTime": (
+                                result_data.get("processingTime", 0)
+                                or job.get("processingTime", 0)
+                            ),
                         },
                     }
 
@@ -1211,33 +1282,44 @@ class WhisperAPIClient:
                 not_found_retries += 1
                 server_msg = f" em {server_url}" if server_url else ""
 
-                # Tentar recuperar resultado de /completed-jobs (o job pode ter completado e sido limpo)
-                if not_found_retries <= 3:  # Tentar recuperação nas primeiras tentativas
-                    try:
-                        recovered_result = self._try_recover_from_completed_jobs(
-                            job_id, server_url
-                        )
-                        if recovered_result:
-                            # Marcar sucesso no JobManager
-                            if self._job_manager:
-                                if server_url:
-                                    self._job_manager.mark_server_success(server_url)
-                                if local_job_id:
-                                    result_data = recovered_result.get('result', {})
-                                    metadata = result_data.get('metadata', {})
-                                    processing_time = time.time() - start_time
-                                    self._job_manager.mark_job_completed(
-                                        local_job_id,
-                                        text=result_data.get('text', ''),
-                                        language=metadata.get('language', self.language),
-                                        duration=metadata.get('duration', 0),
-                                        processing_time=processing_time,
-                                    )
+                # SEMPRE tentar recuperar de /completed-jobs (o job pode ter completado
+                # e sido removido do /status muito rapidamente)
+                try:
+                    recovered_result = self._try_recover_from_completed_jobs(
+                        job_id, server_url
+                    )
+                    if recovered_result:
+                        # Verificar se foi realmente completado ou falhou
+                        rec_status = recovered_result.get('status', 'completed')
 
-                            logger.info(f"✅ Job recuperado de /completed-jobs!")
-                            return recovered_result
-                    except Exception as recovery_error:
-                        logger.debug(f"Recuperação falhou: {recovery_error}")
+                        if rec_status == 'failed':
+                            error = recovered_result.get('error', 'Erro desconhecido')
+                            if self._job_manager and local_job_id:
+                                self._job_manager.mark_job_failed(local_job_id, error)
+                            raise RuntimeError(f"Transcrição falhou: {error}")
+
+                        # Marcar sucesso no JobManager
+                        if self._job_manager:
+                            if server_url:
+                                self._job_manager.mark_server_success(server_url)
+                            if local_job_id:
+                                result_data = recovered_result.get('result', {})
+                                metadata = result_data.get('metadata', {})
+                                processing_time = time.time() - start_time
+                                self._job_manager.mark_job_completed(
+                                    local_job_id,
+                                    text=result_data.get('text', ''),
+                                    language=metadata.get('language', self.language),
+                                    duration=metadata.get('duration', 0),
+                                    processing_time=processing_time,
+                                )
+
+                        logger.info(f"✅ Job recuperado de /completed-jobs!")
+                        return recovered_result
+                except RuntimeError:
+                    raise
+                except Exception as recovery_error:
+                    logger.debug(f"Recuperação falhou: {recovery_error}")
 
                 if not_found_retries <= max_not_found_retries:
                     # Aumentar delay exponencialmente: 2s, 4s, 6s, 8s...
