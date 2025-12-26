@@ -150,8 +150,117 @@
                         <small>Ultra Economia: ~500mW | Performance: ~1800mW</small>
                     </div>
 
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="power_auto_adjust" name="power_management.auto_adjust">
+                            ⚡ Ajuste Automático de Energia
+                        </label>
+                        <small>Ajusta automaticamente baseado em atividade e temperatura</small>
+                    </div>
+
                     <div id="power_status_card" class="listener-status" style="margin-top: 12px;">
                         <span id="power_status_text">Status: Verificando...</span>
+                    </div>
+
+                    <hr style="margin: 20px 0; border-color: #333;">
+                    <h3>🌙 Economia Extrema (Hardware)</h3>
+                    <small style="color: var(--text-muted); margin-bottom: 12px; display: block;">
+                        Desative hardware não utilizado para máxima economia
+                    </small>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="disable_hdmi" name="power_management.disable_hdmi">
+                            📺 Desabilitar HDMI
+                        </label>
+                        <small>Economiza ~30mA. Use apenas via SSH/web.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="disable_bluetooth" name="power_management.disable_bluetooth">
+                            📶 Desabilitar Bluetooth
+                        </label>
+                        <small>Economiza ~20mA quando não usado</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="wifi_power_save" name="power_management.wifi_power_save">
+                            📡 WiFi Power Save
+                        </label>
+                        <small>Ativa economia no WiFi (pode aumentar latência)</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="disable_usb" name="power_management.disable_usb">
+                            🔌 Desabilitar USB não usado
+                        </label>
+                        <small>⚠️ Desativa portas USB! Apenas se usar GPIO/ReSpeaker</small>
+                    </div>
+
+                    <hr style="margin: 20px 0; border-color: #333;">
+                    <h3>🎯 Processamento Sob Demanda</h3>
+                    <small style="color: var(--text-muted); margin-bottom: 12px; display: block;">
+                        Desative processamentos automáticos para economizar CPU
+                    </small>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="continuous_listen_enabled" name="usb_receiver.enabled" checked>
+                            🎙️ Escuta Contínua
+                        </label>
+                        <small>Captura áudio 24/7. Desative para economia máxima.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="auto_transcribe" name="usb_receiver.auto_transcribe" checked>
+                            📝 Transcrição Automática
+                        </label>
+                        <small>Transcreve áudio automaticamente. Usa CPU.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="batch_auto_process" name="usb_receiver.auto_process">
+                            🔄 Processamento em Lote Automático
+                        </label>
+                        <small>Processa arquivos .wav pendentes periodicamente</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="whisper_stream" name="whisper.stream_mode">
+                            🔴 Whisper Streaming
+                        </label>
+                        <small>Transcrição em tempo real. Usa muito mais CPU.</small>
+                    </div>
+
+                    <hr style="margin: 20px 0; border-color: #333;">
+                    <h3>🖥️ Interface Web</h3>
+                    <small style="color: var(--text-muted); margin-bottom: 12px; display: block;">
+                        Reduza atualizações para economizar CPU
+                    </small>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="ui_auto_refresh" name="web_interface.auto_refresh" checked>
+                            🔄 Auto-Refresh UI
+                        </label>
+                        <small>Atualiza status automaticamente. Desative para economia.</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="ui_refresh_interval">Intervalo de Atualização</label>
+                        <select id="ui_refresh_interval" name="web_interface.refresh_interval" onchange="updateRefreshIntervals(this.value)">
+                            <option value="5000">5 segundos (mais CPU)</option>
+                            <option value="15000">15 segundos</option>
+                            <option value="30000" selected>30 segundos (padrão)</option>
+                            <option value="60000">60 segundos (economia)</option>
+                            <option value="0">Desabilitado (manual)</option>
+                        </select>
                     </div>
 
                     <hr style="margin: 20px 0; border-color: #333;">

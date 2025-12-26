@@ -705,6 +705,100 @@ async function processOfflineQueue() {
     }
 }
 
+// ==========================================================================
+// Hardware Power Toggles
+// ==========================================================================
+
+async function toggleHardware(component, enabled) {
+    try {
+        const result = await apiPost('power/hardware', { component, enabled });
+        if (result.success) {
+            showToast(`${component} ${enabled ? 'habilitado' : 'desabilitado'}`, 'success');
+        } else {
+            showToast(result.message || `Erro ao controlar ${component}`, 'error');
+        }
+    } catch (error) {
+        console.error(`Erro ao controlar ${component}:`, error);
+        showToast(`Erro ao controlar ${component}`, 'error');
+    }
+}
+
+async function refreshHardwareStatus() {
+    try {
+        const resp = await apiGet('power/hardware/status');
+        const status = resp.status || {};
+
+        // Atualizar checkboxes baseado no status real
+        const hdmiEl = $('#disable_hdmi');
+        const btEl = $('#disable_bluetooth');
+        const wifiEl = $('#wifi_power_save');
+
+        if (hdmiEl) hdmiEl.checked = !status.hdmi;  // Inverted: disable = not enabled
+        if (btEl) btEl.checked = !status.bluetooth;
+        if (wifiEl) wifiEl.checked = status.wifi_power_save;
+    } catch (error) {
+        console.error('Erro ao obter status de hardware:', error);
+    }
+}
+
+// Intervals storage for dynamic control
+let refreshIntervals = {};
+
+function updateRefreshIntervals(intervalMs) {
+    const interval = parseInt(intervalMs) || 30000;
+
+    // Save preference
+    localStorage.setItem('refreshInterval', interval);
+
+    // Clear existing intervals
+    Object.values(refreshIntervals).forEach(id => clearInterval(id));
+    refreshIntervals = {};
+
+    if (interval === 0) {
+        showToast('Auto-refresh desabilitado', 'info');
+        return;
+    }
+
+    // Set new intervals
+    refreshIntervals.power = setInterval(refreshPowerStatus, interval);
+    refreshIntervals.queue = setInterval(refreshQueueStatus, interval);
+    refreshIntervals.system = setInterval(refreshSystemInfo, interval);
+    refreshIntervals.batch = setInterval(refreshBatchStatus, Math.max(interval, 60000));
+
+    showToast(`Auto-refresh: ${interval/1000}s`, 'info');
+}
+
+// Setup hardware toggle listeners
+function setupHardwareToggles() {
+    const toggles = [
+        { id: 'disable_hdmi', component: 'hdmi', inverted: true },
+        { id: 'disable_bluetooth', component: 'bluetooth', inverted: true },
+        { id: 'wifi_power_save', component: 'wifi_power_save', inverted: false },
+        { id: 'disable_usb', component: 'usb', inverted: true }
+    ];
+
+    toggles.forEach(({ id, component, inverted }) => {
+        const el = $(`#${id}`);
+        if (el) {
+            el.addEventListener('change', function() {
+                // If inverted, unchecked = enabled, checked = disabled
+                const enabled = inverted ? !this.checked : this.checked;
+                toggleHardware(component, enabled);
+            });
+        }
+    });
+
+    // Refresh interval toggle
+    const autoRefreshEl = $('#ui_auto_refresh');
+    if (autoRefreshEl) {
+        autoRefreshEl.addEventListener('change', function() {
+            const intervalEl = $('#ui_refresh_interval');
+            const interval = this.checked ? (intervalEl ? intervalEl.value : 30000) : 0;
+            updateRefreshIntervals(interval);
+        });
+    }
+}
+
 async function testAudio() {
     const resultBox = $('#audio-test-result');
     resultBox.textContent = 'Testando...';
@@ -2815,15 +2909,18 @@ document.addEventListener('DOMContentLoaded', () => {
     // Check USB receiver auto-start after config is loaded
     setTimeout(checkAutoStart, 1000);
 
-    // Auto-refresh system info every 30s
-    setInterval(refreshSystemInfo, 30000);
-
-    // Auto-refresh batch status every 60s
-    setInterval(refreshBatchStatus, 60000);
+    // Setup hardware toggle listeners
+    setupHardwareToggles();
 
     // Power Management and Offline Queue status
     refreshPowerStatus();
     refreshQueueStatus();
-    setInterval(refreshPowerStatus, 30000);
-    setInterval(refreshQueueStatus, 30000);
+    refreshHardwareStatus();
+
+    // Auto-refresh with dynamic intervals (default 30s)
+    const savedInterval = localStorage.getItem('refreshInterval') || 30000;
+    refreshIntervals.power = setInterval(refreshPowerStatus, savedInterval);
+    refreshIntervals.queue = setInterval(refreshQueueStatus, savedInterval);
+    refreshIntervals.system = setInterval(refreshSystemInfo, savedInterval);
+    refreshIntervals.batch = setInterval(refreshBatchStatus, 60000);
 });

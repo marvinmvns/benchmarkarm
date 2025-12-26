@@ -1028,6 +1028,92 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/power/hardware", methods=["POST"])
+    def power_hardware_toggle():
+        """Controla hardware para economia de energia (HDMI, Bluetooth, WiFi, USB)."""
+        import subprocess
+        try:
+            data = request.get_json() or {}
+            component = data.get('component', '')
+            enabled = data.get('enabled', True)
+
+            commands = {
+                'hdmi': {
+                    True: ['vcgencmd', 'display_power', '1'],
+                    False: ['vcgencmd', 'display_power', '0']
+                },
+                'bluetooth': {
+                    True: ['sudo', 'systemctl', 'start', 'bluetooth'],
+                    False: ['sudo', 'systemctl', 'stop', 'bluetooth']
+                },
+                'wifi_power_save': {
+                    True: ['sudo', 'iwconfig', 'wlan0', 'power', 'on'],
+                    False: ['sudo', 'iwconfig', 'wlan0', 'power', 'off']
+                },
+                'usb': {
+                    # USB power control via sysfs
+                    True: ['sudo', 'sh', '-c', 'echo 1 > /sys/devices/platform/soc/3f980000.usb/buspower'],
+                    False: ['sudo', 'sh', '-c', 'echo 0 > /sys/devices/platform/soc/3f980000.usb/buspower']
+                }
+            }
+
+            if component not in commands:
+                return jsonify({"error": f"Componente inválido: {component}"}), 400
+
+            cmd = commands[component][enabled]
+            try:
+                result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+                success = result.returncode == 0
+
+                action = 'habilitado' if enabled else 'desabilitado'
+                if success:
+                    logger.info(f"Hardware {component} {action}")
+                else:
+                    logger.warning(f"Falha ao controlar {component}: {result.stderr}")
+
+                return jsonify({
+                    "success": success,
+                    "component": component,
+                    "enabled": enabled,
+                    "message": result.stderr if not success else f"{component} {action}"
+                })
+            except subprocess.TimeoutExpired:
+                return jsonify({"error": f"Timeout ao controlar {component}"}), 500
+            except FileNotFoundError:
+                return jsonify({"error": f"Comando não disponível para {component}"}), 400
+
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/power/hardware/status", methods=["GET"])
+    def power_hardware_status():
+        """Retorna status dos componentes de hardware."""
+        import subprocess
+        status = {}
+
+        # HDMI
+        try:
+            result = subprocess.run(['vcgencmd', 'display_power'], capture_output=True, text=True, timeout=5)
+            status['hdmi'] = '1' in result.stdout
+        except:
+            status['hdmi'] = True
+
+        # Bluetooth
+        try:
+            result = subprocess.run(['systemctl', 'is-active', 'bluetooth'], capture_output=True, text=True, timeout=5)
+            status['bluetooth'] = result.returncode == 0
+        except:
+            status['bluetooth'] = False
+
+        # WiFi Power Save
+        try:
+            result = subprocess.run(['iwconfig', 'wlan0'], capture_output=True, text=True, timeout=5)
+            status['wifi_power_save'] = 'Power Management:on' in result.stdout
+        except:
+            status['wifi_power_save'] = False
+
+        return jsonify({"success": True, "status": status})
+
     # ==========================================================================
     # Offline Queue - Fila de áudios sem internet
     # ==========================================================================
