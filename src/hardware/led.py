@@ -158,6 +158,43 @@ class LEDController:
     def is_available(self) -> bool:
         """Verifica se os LEDs estão disponíveis."""
         return self.enabled and self._apa102 is not None
+
+    def set_enabled(self, enabled: bool):
+        """
+        Altera o estado enabled dos LEDs em runtime.
+
+        Args:
+            enabled: True para habilitar, False para desabilitar
+        """
+        if self.enabled == enabled:
+            return  # Sem mudança
+
+        self.enabled = enabled
+
+        if not enabled:
+            # Desabilitar: parar animações e desligar LEDs
+            self._stop_animation()
+            if self._apa102:
+                self._apa102.off()
+            logger.info("💡 LEDs desabilitados")
+        else:
+            # Habilitar: verificar se SPI está disponível
+            if not SPI_AVAILABLE:
+                self.enabled = False
+                logger.warning("💡 LEDs não podem ser habilitados (SPI indisponível)")
+                return
+
+            # Inicializar APA102 se necessário
+            if self._apa102 is None:
+                try:
+                    self._apa102 = APA102(num_led=self.num_leds, brightness=self.brightness)
+                    self._apa102.off()
+                except Exception as e:
+                    logger.warning(f"Erro ao inicializar LEDs: {e}")
+                    self.enabled = False
+                    return
+
+            logger.info("💡 LEDs habilitados")
     
     def _set_color(self, color: Tuple[int, int, int]):
         """Define todos os LEDs com uma cor."""

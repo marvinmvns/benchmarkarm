@@ -279,18 +279,26 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
     # Configurar LEDs
     try:
         from src.hardware.led import LEDController
-        # Load logic inline to avoid issues
+        # Load config
         with open(config_path, "r") as f:
             full_config = yaml.safe_load(f) or {}
-            
-        led_conf = full_config.get('hardware', {}).get('leds', {})
+
+        hardware_conf = full_config.get('hardware', {})
+        # Feature toggle: hardware.led_enabled (da UI)
+        led_enabled = hardware_conf.get('led_enabled', True)
+        # Configurações adicionais de LEDs (opcional)
+        led_conf = hardware_conf.get('leds', {})
+
         app.led_controller = LEDController(
             num_leds=led_conf.get('num_leds', 3),
             brightness=led_conf.get('brightness', 10),
-            enabled=led_conf.get('enabled', True)
+            enabled=led_enabled
         )
-        app.led_controller.flash_random()
-        logger.info("💡 LEDs inicializados")
+        if led_enabled:
+            app.led_controller.flash_random()
+            logger.info("💡 LEDs inicializados (enabled)")
+        else:
+            logger.info("💡 LEDs desabilitados via config")
     except Exception as e:
         logger.warning(f"Falha ao iniciar LEDs: {e}")
         app.led_controller = None
@@ -414,9 +422,6 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
     @app.route("/api/config", methods=["POST"])
     def update_config():
         """Atualiza configuração via JSON."""
-        if app.led_controller:
-            app.led_controller.flash_random()
-            
         try:
             new_config = request.get_json()
             if not new_config:
@@ -427,7 +432,7 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             # Carregar config atual para fazer merge
             current_config = load_config()
             logger.info(f"Config atual antes do merge: {current_config}")
-            
+
             # Recursive update helper
             def deep_update(target, source):
                 for k, v in source.items():
@@ -442,6 +447,18 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
 
             if save_config(updated_config):
                 logger.info("Configuração salva com sucesso")
+
+                # Atualizar estado do LED em runtime se mudou
+                if app.led_controller:
+                    new_led_enabled = updated_config.get('hardware', {}).get('led_enabled', True)
+                    old_led_enabled = current_config.get('hardware', {}).get('led_enabled', True)
+                    if new_led_enabled != old_led_enabled:
+                        app.led_controller.set_enabled(new_led_enabled)
+                        logger.info(f"LED enabled alterado: {old_led_enabled} -> {new_led_enabled}")
+                    elif new_led_enabled:
+                        # Flash para confirmar que config foi salva
+                        app.led_controller.flash_random()
+
                 return jsonify({"success": True, "message": "Configuração salva!"})
             else:
                 logger.error("Falha ao salvar configuração")
