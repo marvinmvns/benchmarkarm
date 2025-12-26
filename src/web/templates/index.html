@@ -27,7 +27,6 @@
             <button class="tab-btn" data-tab="llm">LLM</button>
 
             <button class="tab-btn" data-tab="offline">Offline</button>
-            <button class="tab-btn" data-tab="power">Energia</button>
             <button class="tab-btn" data-tab="usb-receiver">🎧 Escuta Contínua</button>
             <button class="tab-btn" data-tab="files">📂 Arquivos</button>
             <button class="tab-btn" data-tab="history">📚 Histórico</button>
@@ -675,63 +674,6 @@
                 <p>Conectividade: <span id="queue-online">-</span></p>
             </div>
             <button type="button" id="btn-refresh-queue" class="btn btn-secondary">🔄 Atualizar</button>
-        </div>
-    </section>
-
-    <!-- Power Management Tab -->
-    <section id="tab-power" class="tab-content">
-        <h2>Gerenciamento de Energia</h2>
-
-        <div class="form-group">
-            <label>
-                <input type="checkbox" id="power_enabled" name="power_management.enabled">
-                <strong>Habilitar Gerenciamento de Energia</strong>
-            </label>
-            <small>Feature toggle - controla consumo de energia</small>
-        </div>
-
-        <div class="form-group">
-            <label for="power_mode">Modo Padrão</label>
-            <select id="power_mode" name="power_management.default_mode">
-                <option value="performance">Performance (~1800mW)</option>
-                <option value="balanced">Equilibrado (~1200mW)</option>
-                <option value="power_save">Economia (~800mW)</option>
-                <option value="ultra_power_save">Ultra Economia (~500mW)</option>
-            </select>
-        </div>
-
-        <div class="form-group">
-            <label>
-                <input type="checkbox" id="power_auto_adjust" name="power_management.auto_adjust" checked>
-                Ajuste Automático
-            </label>
-            <small>Ajusta baseado em atividade e temperatura</small>
-        </div>
-
-        <div class="form-group">
-            <label for="idle_timeout">Timeout para Idle (s)</label>
-            <input type="number" id="idle_timeout" name="power_management.idle_timeout" min="30" max="600" value="60">
-        </div>
-
-        <div class="form-group">
-            <label for="temp_high">Temperatura Alta (°C)</label>
-            <input type="number" id="temp_high" name="power_management.thermal.threshold_high" min="50" max="80"
-                value="70">
-        </div>
-
-        <div class="form-group">
-            <label for="temp_critical">Temperatura Crítica (°C)</label>
-            <input type="number" id="temp_critical" name="power_management.thermal.threshold_critical" min="60" max="90"
-                value="80">
-        </div>
-
-        <div class="status-card">
-            <h3>Status de Energia</h3>
-            <div id="power-stats">
-                <p>Modo Atual: <span id="power-current-mode">-</span></p>
-                <p>Temperatura: <span id="power-temp">-</span></p>
-                <p>Idle: <span id="power-idle">-</span></p>
-            </div>
         </div>
     </section>
 

@@ -598,7 +598,6 @@ function initTabs() {
             // Refresh data for specific tabs
             if (btn.dataset.tab === 'system') refreshSystemInfo();
             if (btn.dataset.tab === 'offline') refreshQueueStats();
-            if (btn.dataset.tab === 'power') refreshPowerStatus();
             if (btn.dataset.tab === 'transcription') refreshProcessorStatus();
             if (btn.dataset.tab === 'models') refreshModelStatus();
             if (btn.dataset.tab === 'usb-receiver') {
