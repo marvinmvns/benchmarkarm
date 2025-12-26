@@ -1014,6 +1014,19 @@ class WhisperAPIClient:
                     # Se há mensagem de erro real, o job falhou durante processamento
                     # Não é um "job não encontrado", é um "job falhou"
                     if error_msg and "transcription failed" in error_msg.lower():
+                        # Caso especial: "No transcription text extracted" significa áudio sem fala
+                        # Tratar como sucesso com texto vazio em vez de erro
+                        if "no transcription text" in error_msg.lower():
+                            logger.info(f"⏭️ Job {job_id[:8]}: áudio sem texto (silêncio ou ruído)")
+                            return {
+                                "status": "completed",
+                                "result": {
+                                    "text": "",
+                                    "language": "pt",
+                                    "duration": 0.0,
+                                    "segments": [],
+                                },
+                            }
                         logger.error(f"❌ Job {job_id[:8]} falhou durante processamento: {error_msg}")
                         return {
                             "status": "failed",
