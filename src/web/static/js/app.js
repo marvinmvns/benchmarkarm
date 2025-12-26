@@ -164,6 +164,9 @@ function populateForm(cfg) {
         $('#whisper_threads').value = cfg.whisper.threads || 2;  // Default 2 para Pi Zero
         $('#whisper_beam_size').value = cfg.whisper.beam_size || 1;
         $('#whisper_stream_mode').checked = cfg.whisper.stream_mode === true;
+        // Also set whisper_stream (in General tab)
+        const whisperStreamGeneral = $('#whisper_stream');
+        if (whisperStreamGeneral) whisperStreamGeneral.checked = cfg.whisper.stream_mode === true;
         if (cfg.whisper.openai_api_key) {
             $('#whisper_openai_api_key').value = cfg.whisper.openai_api_key;
         }
@@ -250,6 +253,18 @@ function populateForm(cfg) {
 
     // USB Receiver / Escuta Contínua
     if (cfg.usb_receiver) {
+        // Also set batch_auto_process (in General tab)
+        const batchAutoProcess = $('#batch_auto_process');
+        if (batchAutoProcess) batchAutoProcess.checked = cfg.usb_receiver.auto_process === true;
+
+        // Also set continuous_listen_enabled (in General tab)
+        const continuousListenEnabled = $('#continuous_listen_enabled');
+        if (continuousListenEnabled) continuousListenEnabled.checked = cfg.usb_receiver.enabled !== false;
+
+        // Also set auto_transcribe (in General tab)
+        const autoTranscribe = $('#auto_transcribe');
+        if (autoTranscribe) autoTranscribe.checked = cfg.usb_receiver.auto_transcribe !== false;
+
         const fields = {
             'usb_receiver_enabled': { val: cfg.usb_receiver.enabled !== false, type: 'checked' },
             'usb_continuous_listen': { val: cfg.usb_receiver.continuous_listen !== false, type: 'checked' },
@@ -358,7 +373,11 @@ function collectFormValues() {
     config.whisper.use_cpp = $('#whisper_use_cpp').checked;
     config.whisper.threads = parseInt($('#whisper_threads').value);
     config.whisper.beam_size = parseInt($('#whisper_beam_size').value);
-    config.whisper.stream_mode = $('#whisper_stream_mode').checked;
+    // Check both whisper_stream_mode (Settings tab) and whisper_stream (General tab)
+    const whisperStreamMode = $('#whisper_stream_mode');
+    const whisperStreamGeneral = $('#whisper_stream');
+    if (whisperStreamMode) config.whisper.stream_mode = whisperStreamMode.checked;
+    else if (whisperStreamGeneral) config.whisper.stream_mode = whisperStreamGeneral.checked;
     config.whisper.openai_api_key = $('#whisper_openai_api_key').value;
     config.whisper.whisperapi_url = $('#whisperapi_url').value;
 
@@ -455,6 +474,15 @@ function collectFormValues() {
 
     // USB Receiver / Escuta Contínua
     if (!config.usb_receiver) config.usb_receiver = {};
+
+    // General tab fields (override settings tab if present)
+    const batchAutoProcess = $('#batch_auto_process');
+    const continuousListenEnabled = $('#continuous_listen_enabled');
+    const autoTranscribe = $('#auto_transcribe');
+
+    if (batchAutoProcess) config.usb_receiver.auto_process = batchAutoProcess.checked;
+    if (continuousListenEnabled) config.usb_receiver.enabled = continuousListenEnabled.checked;
+    if (autoTranscribe) config.usb_receiver.auto_transcribe = autoTranscribe.checked;
 
     const usbFields = [
         { id: 'usb_receiver_enabled', key: 'enabled', type: 'checked' },
