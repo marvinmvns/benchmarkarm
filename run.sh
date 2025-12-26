@@ -166,7 +166,7 @@ do_start_bg() {
 # Parar servidor
 do_stop() {
     log_info "=== Parando Servidor ==="
-    
+
     if systemctl is-active --quiet voice-processor 2>/dev/null; then
         sudo systemctl stop voice-processor
         log_success "Serviço parado"
@@ -176,6 +176,27 @@ do_stop() {
         log_success "Servidor parado"
     else
         log_warn "Nenhum servidor rodando"
+    fi
+}
+
+# Reiniciar servidor
+do_restart() {
+    log_info "=== Reiniciando Servidor ==="
+    do_stop
+    sleep 2
+    do_start_bg
+}
+
+# Ver logs
+do_logs() {
+    log_info "=== Logs do Servidor ==="
+
+    if systemctl is-active --quiet voice-processor 2>/dev/null; then
+        sudo journalctl -u voice-processor -f --no-pager
+    elif [ -f "logs/server.log" ]; then
+        tail -f logs/server.log
+    else
+        log_warn "Nenhum log disponível"
     fi
 }
 
@@ -263,6 +284,8 @@ show_help() {
     echo "  start       Iniciar servidor web (foreground)"
     echo "  start-bg    Iniciar servidor em background"
     echo "  stop        Parar servidor"
+    echo "  restart     Reiniciar servidor"
+    echo "  logs        Ver logs em tempo real"
     echo "  status      Ver status do sistema"
     echo "  full        Setup completo (install + setup)"
     echo "  help        Mostrar esta ajuda"
@@ -271,6 +294,8 @@ show_help() {
     echo "  ./run.sh full          # Primeira instalação"
     echo "  ./run.sh start         # Iniciar servidor"
     echo "  ./run.sh start 3000    # Iniciar na porta 3000"
+    echo "  ./run.sh restart       # Reiniciar o servidor"
+    echo "  ./run.sh logs          # Ver logs em tempo real"
     echo ""
 }
 
@@ -296,6 +321,12 @@ case "${1:-}" in
         ;;
     stop)
         do_stop
+        ;;
+    restart)
+        do_restart
+        ;;
+    logs)
+        do_logs
         ;;
     status)
         do_status
