@@ -491,18 +491,25 @@ async function refreshPowerStatus() {
         const el = $('#power_status_text');
         if (!el) return;
 
+        // Parsear temperatura (vem como "temp=37.6'C")
+        let temp = 'N/A';
+        if (status.temperature) {
+            const match = status.temperature.match(/temp=([\d.]+)/);
+            if (match) temp = `${parseFloat(match[1]).toFixed(1)}°C`;
+        }
+
+        const mode = status.current_mode || 'balanced';
+        const modeNames = {
+            'performance': '🚀 Performance',
+            'balanced': '⚖️ Balanceado',
+            'power_save': '🔋 Economia',
+            'ultra_power_save': '🌙 Ultra Economia'
+        };
+
         if (status.feature_enabled) {
-            const temp = status.temperature ? `${status.temperature.toFixed(1)}°C` : 'N/A';
-            const mode = status.current_mode || 'balanced';
-            const modeNames = {
-                'performance': '🚀 Performance',
-                'balanced': '⚖️ Balanceado',
-                'power_save': '🔋 Economia',
-                'ultra_power_save': '🌙 Ultra Economia'
-            };
             el.innerHTML = `<strong style="color: #4CAF50;">✓ Ativo</strong> | Modo: ${modeNames[mode] || mode} | Temp: ${temp}`;
         } else {
-            el.innerHTML = `<span style="color: #888;">Desabilitado</span>`;
+            el.innerHTML = `<span style="color: #888;">Desabilitado</span> | Temp: ${temp}`;
         }
     } catch (error) {
         console.error('Erro ao obter status de energia:', error);
@@ -514,11 +521,11 @@ async function refreshPowerStatus() {
 async function setPowerMode(mode) {
     try {
         await apiPost('power/mode', { mode: mode });
-        showNotification(`Modo de energia alterado para: ${mode}`, 'success');
+        showToast(`Modo de energia alterado para: ${mode}`, 'success');
         refreshPowerStatus();
     } catch (error) {
         console.error('Erro ao definir modo de energia:', error);
-        showNotification('Erro ao alterar modo de energia', 'error');
+        showToast('Erro ao alterar modo de energia', 'error');
     }
 }
 
@@ -549,14 +556,14 @@ async function processOfflineQueue() {
     try {
         const result = await apiPost('queue/process', {});
         if (result.success) {
-            showNotification(`Processados ${result.processed || 0} itens da fila`, 'success');
+            showToast(`Processados ${result.processed || 0} itens da fila`, 'success');
         } else {
-            showNotification(result.message || 'Não foi possível processar', 'warning');
+            showToast(result.message || 'Não foi possível processar', 'warning');
         }
         refreshQueueStatus();
     } catch (error) {
         console.error('Erro ao processar fila:', error);
-        showNotification('Erro ao processar fila offline', 'error');
+        showToast('Erro ao processar fila offline', 'error');
     }
 }
 
