@@ -507,9 +507,9 @@ async function refreshPowerStatus() {
         };
 
         if (status.feature_enabled) {
-            el.innerHTML = `<strong style="color: #4CAF50;">✓ Ativo</strong> | Modo: ${modeNames[mode] || mode} | Temp: ${temp}`;
+            el.textContent = `✓ Ativo | Modo: ${modeNames[mode] || mode} | Temp: ${temp}`;
         } else {
-            el.innerHTML = `<span style="color: #888;">Desabilitado</span> | Temp: ${temp}`;
+            el.textContent = `Desabilitado | Temp: ${temp}`;
         }
     } catch (error) {
         console.error('Erro ao obter status de energia:', error);
@@ -541,9 +541,9 @@ async function refreshQueueStatus() {
         const onlineIcon = online ? '🟢 Online' : '🔴 Offline';
 
         if (pending > 0) {
-            el.innerHTML = `${onlineIcon} | <strong style="color: #FFC107;">${pending} áudios na fila</strong>`;
+            el.textContent = `${onlineIcon} | ${pending} áudios na fila`;
         } else {
-            el.innerHTML = `${onlineIcon} | Fila vazia`;
+            el.textContent = `${onlineIcon} | Fila vazia`;
         }
     } catch (error) {
         console.error('Erro ao obter status da fila:', error);

@@ -151,9 +151,9 @@
                         <small>Ultra Economia: ~500mW | Performance: ~1800mW</small>
                     </div>
 
-                    <p id="power_status_card" style="margin-top: 12px;">
-                        <span id="power_status_text">Status: Verificando...</span>
-                    </p>
+                    <div id="power_status_card" style="margin-top: 12px;">
+                        <span id="power_status_text" class="badge">Status: Verificando...</span>
+                    </div>
 
                     <hr style="margin: 20px 0; border-color: #333;">
                     <h3>📡 Fila Offline (Sem Internet)</h3>
@@ -174,10 +174,10 @@
                         <small>Usa whisper.cpp local se não houver internet (mais lento)</small>
                     </div>
 
-                    <p id="queue_status_card" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
-                        <span id="queue_status_text">Status: Verificando...</span>
+                    <div id="queue_status_card" style="margin-top: 12px; display: flex; justify-content: space-between; align-items: center;">
+                        <span id="queue_status_text" class="badge">Status: Verificando...</span>
                         <button onclick="processOfflineQueue()" class="btn btn-small">Processar Fila</button>
-                    </p>
+                    </div>
                 </div>
             </section>
 
