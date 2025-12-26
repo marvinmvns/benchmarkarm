@@ -268,12 +268,24 @@ class ContinuousListener:
             try:
                 processor = self._get_processor()
                 transcription = processor.transcribe(audio)
-                text = transcription.text
-                transcription_success = True
+                text = transcription.text.strip() if transcription.text else ""
 
                 # Extrair informações do servidor
                 server_url = getattr(transcription, 'server_url', None)
                 server_name = getattr(transcription, 'server_name', None)
+
+                # Se não houver texto, apenas limpar o arquivo e não registrar
+                if not text or text.startswith("[Erro"):
+                    logger.info(f"⏭️ Áudio sem texto útil - descartando: {filename}")
+                    if audio_file:
+                        try:
+                            Path(audio_file).unlink()
+                            logger.debug(f"🗑️ Áudio sem texto removido: {filename}")
+                        except Exception:
+                            pass
+                    return  # Não registra nada
+
+                transcription_success = True
 
                 logger.info(
                     f"✅ Transcrição ({server_name or 'local'}): "
@@ -281,7 +293,7 @@ class ContinuousListener:
                 )
 
                 # Gerar resumo (opcional - não falha processamento se der erro)
-                if self.usb_config.auto_summarize and text.strip() and processor.llm:
+                if self.usb_config.auto_summarize and text and processor.llm:
                     try:
                         response = processor.summarize(text)
                         summary = response.text
