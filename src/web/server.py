@@ -650,12 +650,23 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         nonlocal _power_manager
         if _power_manager is None:
             try:
-                from ..utils.power import AdaptivePowerManager
+                from ..utils.power import AdaptivePowerManager, PowerMode
                 config = load_config()
                 pm_config = config.get('power_management', {})
+
+                # Converter string para enum PowerMode
+                mode_str = pm_config.get('default_mode', 'balanced').upper()
+                mode_map = {
+                    'PERFORMANCE': PowerMode.PERFORMANCE,
+                    'BALANCED': PowerMode.BALANCED,
+                    'POWER_SAVE': PowerMode.POWER_SAVE,
+                    'ULTRA_POWER_SAVE': PowerMode.ULTRA_POWER_SAVE,
+                }
+                default_mode = mode_map.get(mode_str, PowerMode.BALANCED)
+
                 _power_manager = AdaptivePowerManager(
                     enabled=pm_config.get('enabled', False),
-                    default_mode=pm_config.get('default_mode', 'balanced'),
+                    default_mode=default_mode,
                 )
             except Exception as e:
                 logger.warning(f"PowerManager não disponível: {e}")
@@ -706,16 +717,27 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
     def power_set_mode():
         """Define modo de energia."""
         try:
+            from ..utils.power import PowerMode
+
             data = request.get_json() or {}
-            mode = data.get('mode', 'balanced')
+            mode_str = data.get('mode', 'balanced').upper()
+
+            # Converter string para enum
+            mode_map = {
+                'PERFORMANCE': PowerMode.PERFORMANCE,
+                'BALANCED': PowerMode.BALANCED,
+                'POWER_SAVE': PowerMode.POWER_SAVE,
+                'ULTRA_POWER_SAVE': PowerMode.ULTRA_POWER_SAVE,
+            }
+            mode = mode_map.get(mode_str, PowerMode.BALANCED)
 
             pm = get_power_manager()
             if pm:
                 if not pm.enabled:
                     pm.enabled = True
                 pm.set_mode(mode)
-                logger.info(f"Modo de energia alterado para: {mode}")
-                return jsonify({"success": True, "mode": mode})
+                logger.info(f"Modo de energia alterado para: {mode.value}")
+                return jsonify({"success": True, "mode": mode.value})
             else:
                 return jsonify({"error": "Power Manager não disponível"}), 400
         except Exception as e:
