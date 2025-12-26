@@ -235,6 +235,17 @@ function populateForm(cfg) {
             if (tempHigh) tempHigh.value = cfg.power_management.thermal.threshold_high || 70;
             if (tempCritical) tempCritical.value = cfg.power_management.thermal.threshold_critical || 80;
         }
+
+        // Hardware toggles
+        const disableHdmi = $('#disable_hdmi');
+        const disableBluetooth = $('#disable_bluetooth');
+        const disableUsb = $('#disable_usb');
+        const wifiPowerSave = $('#wifi_power_save');
+
+        if (disableHdmi) disableHdmi.checked = cfg.power_management.disable_hdmi === true;
+        if (disableBluetooth) disableBluetooth.checked = cfg.power_management.disable_bluetooth === true;
+        if (disableUsb) disableUsb.checked = cfg.power_management.disable_usb === true;
+        if (wifiPowerSave) wifiPowerSave.checked = cfg.power_management.wifi_power_save === true;
     }
 
     // USB Receiver / Escuta Contínua
@@ -430,6 +441,17 @@ function collectFormValues() {
     if (!config.power_management.thermal) config.power_management.thermal = {};
     if (tempHigh) config.power_management.thermal.threshold_high = parseFloat(tempHigh.value);
     if (tempCritical) config.power_management.thermal.threshold_critical = parseFloat(tempCritical.value);
+
+    // Hardware toggles
+    const disableHdmi = $('#disable_hdmi');
+    const disableBluetooth = $('#disable_bluetooth');
+    const disableUsb = $('#disable_usb');
+    const wifiPowerSave = $('#wifi_power_save');
+
+    if (disableHdmi) config.power_management.disable_hdmi = disableHdmi.checked;
+    if (disableBluetooth) config.power_management.disable_bluetooth = disableBluetooth.checked;
+    if (disableUsb) config.power_management.disable_usb = disableUsb.checked;
+    if (wifiPowerSave) config.power_management.wifi_power_save = wifiPowerSave.checked;
 
     // USB Receiver / Escuta Contínua
     if (!config.usb_receiver) config.usb_receiver = {};

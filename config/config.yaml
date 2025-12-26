@@ -226,6 +226,12 @@ power_management:
   # Modo automático (ajusta baseado em atividade e temperatura)
   auto_adjust: true
 
+  # Controles de hardware para economia (globais)
+  disable_hdmi: false
+  disable_bluetooth: false
+  disable_usb: false
+  wifi_power_save: false
+
   # Tempo de inatividade para entrar em modo idle (segundos)
   idle_timeout: 60
 
