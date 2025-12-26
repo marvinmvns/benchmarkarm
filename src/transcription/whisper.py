@@ -1645,7 +1645,9 @@ class WhisperAPIClient:
                     self._job_manager.mark_job_completed(
                         local_job_id,
                         text=local_result.text,
-                        metadata={"fallback": "local", "model": local_result.model},
+                        language=local_result.language or self.language,
+                        duration=local_result.duration or 0.0,
+                        processing_time=local_result.processing_time or 0.0,
                     )
 
                 logger.info(f"✅ Fallback local bem-sucedido! ({local_result.processing_time:.1f}s)")

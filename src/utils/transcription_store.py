@@ -114,10 +114,10 @@ class TranscriptionStore:
     def save(self, record: TranscriptionRecord) -> str:
         """
         Salva uma transcrição.
-        
+
         Args:
             record: Registro de transcrição
-            
+
         Returns:
             ID da transcrição salva
         """
@@ -127,10 +127,10 @@ class TranscriptionStore:
                     record.id = str(uuid.uuid4())
                 if not record.created_at:
                     record.created_at = datetime.now()
-                
+
                 conn.execute("""
-                    INSERT OR REPLACE INTO transcriptions 
-                    (id, timestamp, duration_seconds, text, summary, audio_file, 
+                    INSERT OR REPLACE INTO transcriptions
+                    (id, timestamp, duration_seconds, text, summary, audio_file,
                      language, processed_by, llm_result, created_at)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
@@ -146,9 +146,75 @@ class TranscriptionStore:
                     record.created_at.isoformat() if record.created_at else None,
                 ))
                 conn.commit()
-                
+
                 logger.debug(f"Transcrição salva: {record.id}")
-                return record.id
+
+        # Adicionar ao arquivo TXT diário (fora do lock do SQLite)
+        try:
+            self.append_to_daily_txt(record)
+        except Exception as e:
+            logger.warning(f"Erro ao adicionar ao TXT diário: {e}")
+
+        return record.id
+
+    def append_to_daily_txt(self, record: TranscriptionRecord) -> str:
+        """
+        Adiciona transcrição ao arquivo TXT diário de forma incremental.
+
+        Arquivo: DDMMYYYY.txt (ex: 25122025.txt)
+        Local: ~/audio-recordings/daily/
+
+        Args:
+            record: Registro de transcrição
+
+        Returns:
+            Caminho do arquivo TXT
+        """
+        # Determinar a data (usa timestamp do record ou data atual)
+        if record.timestamp:
+            target_date = record.timestamp.date()
+        else:
+            target_date = date.today()
+
+        # Nome do arquivo no formato DDMMYYYY.txt
+        filename = target_date.strftime("%d%m%Y") + ".txt"
+        filepath = self.consolidation_dir / filename
+
+        # Formatar hora
+        if record.timestamp:
+            time_str = record.timestamp.strftime("%H:%M:%S")
+        else:
+            time_str = datetime.now().strftime("%H:%M:%S")
+
+        # Formatar duração
+        duration_str = f"{record.duration_seconds:.1f}s" if record.duration_seconds else "N/A"
+
+        # Montar entrada
+        entry_lines = [
+            "=" * 80,
+            f"[{time_str}] Duração: {duration_str} | Processado por: {record.processed_by}",
+            "-" * 80,
+            record.text.strip() if record.text else "(sem texto)",
+        ]
+
+        # Adicionar resumo se existir
+        if record.summary:
+            entry_lines.extend([
+                "",
+                ">>> Resumo:",
+                record.summary.strip(),
+            ])
+
+        entry_lines.append("")  # Linha em branco final
+
+        entry_text = "\n".join(entry_lines) + "\n"
+
+        # Escrever de forma incremental (append)
+        with open(filepath, "a", encoding="utf-8") as f:
+            f.write(entry_text)
+
+        logger.debug(f"Transcrição adicionada ao TXT diário: {filepath}")
+        return str(filepath)
     
     def get(self, id: str) -> Optional[TranscriptionRecord]:
         """Obtém transcrição por ID."""
