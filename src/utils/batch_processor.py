@@ -383,22 +383,36 @@ class BatchProcessor:
                     # Transcrever
                     transcriber = self._get_transcriber()
                     result = transcriber.transcribe(str(wav_path))
-                    
+
+                    # Verificar se o Whisper retornou texto vazio
+                    text = result.text.strip() if result.text else ""
+                    if not text or text.startswith("[Erro"):
+                        logger.info(
+                            f"⏭️ Descartando {wav_path.name}: Whisper retornou texto vazio ou erro"
+                        )
+                        # Remover arquivo sem conteúdo útil
+                        try:
+                            wav_path.unlink()
+                            logger.debug(f"🗑️ Arquivo sem texto removido: {wav_path.name}")
+                        except Exception:
+                            pass
+                        return True  # Considera "processado"
+
                     # Criar conteúdo do .txt com metadados
                     txt_content = self._format_transcription(
                         wav_name=wav_path.name,
-                        text=result.text,
+                        text=text,
                         duration=result.duration,
                         model=result.model,
                         language=result.language,
                         processing_time=result.processing_time,
                     )
-                
+
                     # Salvar .txt
                     txt_path = wav_path.with_suffix(".txt")
                     txt_path.write_text(txt_content, encoding="utf-8")
                     logger.info(f"✅ Salvo: {txt_path.name}")
-                    
+
                     # Remover .wav
                     wav_path.unlink()
                     logger.info(f"🗑️ Removido: {wav_path.name}")
