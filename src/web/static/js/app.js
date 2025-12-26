@@ -204,44 +204,67 @@ function populateForm(cfg) {
 
     // Offline Queue
     if (cfg.offline_queue) {
-        $('#offline_enabled').checked = cfg.offline_queue.enabled !== false;
-        $('#max_queue_size').value = cfg.offline_queue.max_queue_size || 1000;
-        $('#retry_delay').value = cfg.offline_queue.retry_delay_base || 30;
-        $('#max_retries').value = cfg.offline_queue.max_retries || 3;
-        $('#use_local_fallback').checked = cfg.offline_queue.use_local_fallback !== false;
+        const offlineEnabled = $('#offline_enabled');
+        const maxQueueSize = $('#max_queue_size');
+        const retryDelay = $('#retry_delay');
+        const maxRetries = $('#max_retries');
+        const useLocalFallback = $('#use_local_fallback');
+
+        if (offlineEnabled) offlineEnabled.checked = cfg.offline_queue.enabled !== false;
+        if (maxQueueSize) maxQueueSize.value = cfg.offline_queue.max_queue_size || 1000;
+        if (retryDelay) retryDelay.value = cfg.offline_queue.retry_delay_base || 30;
+        if (maxRetries) maxRetries.value = cfg.offline_queue.max_retries || 3;
+        if (useLocalFallback) useLocalFallback.checked = cfg.offline_queue.use_local_fallback !== false;
     }
 
     // Power Management
     if (cfg.power_management) {
-        $('#power_enabled').checked = cfg.power_management.enabled === true;
-        $('#power_mode').value = cfg.power_management.default_mode || 'balanced';
-        $('#power_auto_adjust').checked = cfg.power_management.auto_adjust !== false;
-        $('#idle_timeout').value = cfg.power_management.idle_timeout || 60;
+        const powerEnabled = $('#power_enabled');
+        const powerMode = $('#power_mode');
+        const powerAutoAdjust = $('#power_auto_adjust');
+        const idleTimeout = $('#idle_timeout');
+        const tempHigh = $('#temp_high');
+        const tempCritical = $('#temp_critical');
+
+        if (powerEnabled) powerEnabled.checked = cfg.power_management.enabled === true;
+        if (powerMode) powerMode.value = cfg.power_management.default_mode || 'balanced';
+        if (powerAutoAdjust) powerAutoAdjust.checked = cfg.power_management.auto_adjust !== false;
+        if (idleTimeout) idleTimeout.value = cfg.power_management.idle_timeout || 60;
 
         if (cfg.power_management.thermal) {
-            $('#temp_high').value = cfg.power_management.thermal.threshold_high || 70;
-            $('#temp_critical').value = cfg.power_management.thermal.threshold_critical || 80;
+            if (tempHigh) tempHigh.value = cfg.power_management.thermal.threshold_high || 70;
+            if (tempCritical) tempCritical.value = cfg.power_management.thermal.threshold_critical || 80;
         }
     }
 
     // USB Receiver / Escuta Contínua
     if (cfg.usb_receiver) {
-        $('#usb_receiver_enabled').checked = cfg.usb_receiver.enabled !== false;
-        $('#usb_continuous_listen').checked = cfg.usb_receiver.continuous_listen !== false;
-        $('#usb_auto_start').checked = cfg.usb_receiver.auto_start === true;
-        $('#usb_auto_process').checked = cfg.usb_receiver.auto_process === true;
-        $('#usb_gadget_enabled').checked = cfg.usb_receiver.usb_gadget_enabled === true;
-        $('#usb_save_directory').value = cfg.usb_receiver.save_directory || '~/audio-recordings';
-        $('#usb_sample_rate').value = cfg.usb_receiver.sample_rate || 44100;
-        $('#usb_channels').value = cfg.usb_receiver.channels || 2;
-        $('#usb_max_duration').value = cfg.usb_receiver.max_audio_duration || 300;
-        $('#usb_auto_transcribe').checked = cfg.usb_receiver.auto_transcribe !== false;
-        $('#usb_auto_summarize').checked = cfg.usb_receiver.auto_summarize !== false;
-        $('#usb_min_duration').value = cfg.usb_receiver.min_audio_duration || 3;
-        $('#usb_silence_split').checked = cfg.usb_receiver.silence_split !== false;
-        $('#usb_silence_threshold').value = cfg.usb_receiver.silence_threshold || 2;
-        $('#usb_process_on_disconnect').checked = cfg.usb_receiver.process_on_disconnect !== false;
-        $('#usb_keep_original').checked = cfg.usb_receiver.keep_original_audio !== false;
+        const fields = {
+            'usb_receiver_enabled': { val: cfg.usb_receiver.enabled !== false, type: 'checked' },
+            'usb_continuous_listen': { val: cfg.usb_receiver.continuous_listen !== false, type: 'checked' },
+            'usb_auto_start': { val: cfg.usb_receiver.auto_start === true, type: 'checked' },
+            'usb_auto_process': { val: cfg.usb_receiver.auto_process === true, type: 'checked' },
+            'usb_gadget_enabled': { val: cfg.usb_receiver.usb_gadget_enabled === true, type: 'checked' },
+            'usb_save_directory': { val: cfg.usb_receiver.save_directory || '~/audio-recordings', type: 'value' },
+            'usb_sample_rate': { val: cfg.usb_receiver.sample_rate || 44100, type: 'value' },
+            'usb_channels': { val: cfg.usb_receiver.channels || 2, type: 'value' },
+            'usb_max_duration': { val: cfg.usb_receiver.max_audio_duration || 300, type: 'value' },
+            'usb_auto_transcribe': { val: cfg.usb_receiver.auto_transcribe !== false, type: 'checked' },
+            'usb_auto_summarize': { val: cfg.usb_receiver.auto_summarize !== false, type: 'checked' },
+            'usb_min_duration': { val: cfg.usb_receiver.min_audio_duration || 3, type: 'value' },
+            'usb_silence_split': { val: cfg.usb_receiver.silence_split !== false, type: 'checked' },
+            'usb_silence_threshold': { val: cfg.usb_receiver.silence_threshold || 2, type: 'value' },
+            'usb_process_on_disconnect': { val: cfg.usb_receiver.process_on_disconnect !== false, type: 'checked' },
+            'usb_keep_original': { val: cfg.usb_receiver.keep_original_audio !== false, type: 'checked' }
+        };
+
+        for (const [id, config] of Object.entries(fields)) {
+            const el = $(`#${id}`);
+            if (el) {
+                if (config.type === 'checked') el.checked = config.val;
+                else el.value = config.val;
+            }
+        }
     }
 }
 
@@ -350,53 +373,95 @@ function collectFormValues() {
 
     // ChatMock config
     if (!config.llm.chatmock) config.llm.chatmock = {};
-    config.llm.chatmock.base_url = $('#chatmock_base_url').value;
-    config.llm.chatmock.model = $('#chatmock_model').value;
-    config.llm.chatmock.reasoning_effort = $('#chatmock_reasoning').value;
-    config.llm.chatmock.max_tokens = parseInt($('#chatmock_max_tokens').value);
-    config.llm.chatmock.enable_web_search = $('#chatmock_web_search').checked;
+    const chatmockFields = [
+        { id: 'chatmock_base_url', key: 'base_url', type: 'value' },
+        { id: 'chatmock_model', key: 'model', type: 'value' },
+        { id: 'chatmock_reasoning', key: 'reasoning_effort', type: 'value' },
+        { id: 'chatmock_max_tokens', key: 'max_tokens', type: 'int' },
+        { id: 'chatmock_web_search', key: 'enable_web_search', type: 'checked' }
+    ];
+    for (const field of chatmockFields) {
+        const el = $(`#${field.id}`);
+        if (el) {
+            if (field.type === 'checked') config.llm.chatmock[field.key] = el.checked;
+            else if (field.type === 'int') config.llm.chatmock[field.key] = parseInt(el.value);
+            else config.llm.chatmock[field.key] = el.value;
+        }
+    }
 
     // Hardware
     if (!config.hardware) config.hardware = {};
-    config.hardware.led_enabled = $('#led_enabled').checked;
+    const ledEnabled = $('#led_enabled');
+    if (ledEnabled) config.hardware.led_enabled = ledEnabled.checked;
 
     // Offline Queue
     if (!config.offline_queue) config.offline_queue = {};
-    config.offline_queue.enabled = $('#offline_enabled').checked;
-    config.offline_queue.max_queue_size = parseInt($('#max_queue_size').value);
-    config.offline_queue.retry_delay_base = parseFloat($('#retry_delay').value);
-    config.offline_queue.max_retries = parseInt($('#max_retries').value);
-    config.offline_queue.use_local_fallback = $('#use_local_fallback').checked;
+    const offlineFields = [
+        { id: 'offline_enabled', key: 'enabled', type: 'checked' },
+        { id: 'max_queue_size', key: 'max_queue_size', type: 'int' },
+        { id: 'retry_delay', key: 'retry_delay_base', type: 'float' },
+        { id: 'max_retries', key: 'max_retries', type: 'int' },
+        { id: 'use_local_fallback', key: 'use_local_fallback', type: 'checked' }
+    ];
+    for (const field of offlineFields) {
+        const el = $(`#${field.id}`);
+        if (el) {
+            if (field.type === 'checked') config.offline_queue[field.key] = el.checked;
+            else if (field.type === 'int') config.offline_queue[field.key] = parseInt(el.value);
+            else if (field.type === 'float') config.offline_queue[field.key] = parseFloat(el.value);
+            else config.offline_queue[field.key] = el.value;
+        }
+    }
 
     // Power Management
     if (!config.power_management) config.power_management = {};
-    config.power_management.enabled = $('#power_enabled').checked;
-    config.power_management.default_mode = $('#power_mode').value;
-    config.power_management.auto_adjust = $('#power_auto_adjust').checked;
-    config.power_management.idle_timeout = parseFloat($('#idle_timeout').value);
+    const powerEnabled = $('#power_enabled');
+    const powerMode = $('#power_mode');
+    const powerAutoAdjust = $('#power_auto_adjust');
+    const idleTimeout = $('#idle_timeout');
+    const tempHigh = $('#temp_high');
+    const tempCritical = $('#temp_critical');
+
+    if (powerEnabled) config.power_management.enabled = powerEnabled.checked;
+    if (powerMode) config.power_management.default_mode = powerMode.value;
+    if (powerAutoAdjust) config.power_management.auto_adjust = powerAutoAdjust.checked;
+    if (idleTimeout) config.power_management.idle_timeout = parseFloat(idleTimeout.value);
 
     if (!config.power_management.thermal) config.power_management.thermal = {};
-    config.power_management.thermal.threshold_high = parseFloat($('#temp_high').value);
-    config.power_management.thermal.threshold_critical = parseFloat($('#temp_critical').value);
+    if (tempHigh) config.power_management.thermal.threshold_high = parseFloat(tempHigh.value);
+    if (tempCritical) config.power_management.thermal.threshold_critical = parseFloat(tempCritical.value);
 
     // USB Receiver / Escuta Contínua
     if (!config.usb_receiver) config.usb_receiver = {};
-    config.usb_receiver.enabled = $('#usb_receiver_enabled').checked;
-    config.usb_receiver.continuous_listen = $('#usb_continuous_listen').checked;
-    config.usb_receiver.auto_start = $('#usb_auto_start').checked;
-    config.usb_receiver.auto_process = $('#usb_auto_process').checked;
-    config.usb_receiver.usb_gadget_enabled = $('#usb_gadget_enabled').checked;
-    config.usb_receiver.save_directory = $('#usb_save_directory').value;
-    config.usb_receiver.sample_rate = parseInt($('#usb_sample_rate').value);
-    config.usb_receiver.channels = parseInt($('#usb_channels').value);
-    config.usb_receiver.max_audio_duration = parseInt($('#usb_max_duration').value);
-    config.usb_receiver.auto_transcribe = $('#usb_auto_transcribe').checked;
-    config.usb_receiver.auto_summarize = $('#usb_auto_summarize').checked;
-    config.usb_receiver.min_audio_duration = parseFloat($('#usb_min_duration').value);
-    config.usb_receiver.silence_split = $('#usb_silence_split').checked;
-    config.usb_receiver.silence_threshold = parseFloat($('#usb_silence_threshold').value);
-    config.usb_receiver.process_on_disconnect = $('#usb_process_on_disconnect').checked;
-    config.usb_receiver.keep_original_audio = $('#usb_keep_original').checked;
+
+    const usbFields = [
+        { id: 'usb_receiver_enabled', key: 'enabled', type: 'checked' },
+        { id: 'usb_continuous_listen', key: 'continuous_listen', type: 'checked' },
+        { id: 'usb_auto_start', key: 'auto_start', type: 'checked' },
+        { id: 'usb_auto_process', key: 'auto_process', type: 'checked' },
+        { id: 'usb_gadget_enabled', key: 'usb_gadget_enabled', type: 'checked' },
+        { id: 'usb_save_directory', key: 'save_directory', type: 'value' },
+        { id: 'usb_sample_rate', key: 'sample_rate', type: 'int' },
+        { id: 'usb_channels', key: 'channels', type: 'int' },
+        { id: 'usb_max_duration', key: 'max_audio_duration', type: 'int' },
+        { id: 'usb_auto_transcribe', key: 'auto_transcribe', type: 'checked' },
+        { id: 'usb_auto_summarize', key: 'auto_summarize', type: 'checked' },
+        { id: 'usb_min_duration', key: 'min_audio_duration', type: 'float' },
+        { id: 'usb_silence_split', key: 'silence_split', type: 'checked' },
+        { id: 'usb_silence_threshold', key: 'silence_threshold', type: 'float' },
+        { id: 'usb_process_on_disconnect', key: 'process_on_disconnect', type: 'checked' },
+        { id: 'usb_keep_original', key: 'keep_original_audio', type: 'checked' }
+    ];
+
+    for (const field of usbFields) {
+        const el = $(`#${field.id}`);
+        if (el) {
+            if (field.type === 'checked') config.usb_receiver[field.key] = el.checked;
+            else if (field.type === 'int') config.usb_receiver[field.key] = parseInt(el.value);
+            else if (field.type === 'float') config.usb_receiver[field.key] = parseFloat(el.value);
+            else config.usb_receiver[field.key] = el.value;
+        }
+    }
 }
 
 // ==========================================================================
