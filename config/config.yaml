@@ -2,12 +2,12 @@
 # =============================================
 
 # Modo de operação: local, api, hybrid
-mode: "hybrid"
+mode: hybrid
 
 # Configuração de Áudio (ReSpeaker)
 audio:
   # Dispositivo de áudio (deixe vazio para auto-detectar)
-  device: ""
+  device: ''
 
   # Taxa de amostragem (16000 é ideal para Whisper)
   sample_rate: 16000
@@ -22,7 +22,7 @@ audio:
   max_duration: 30
 
   # Silêncio para parar gravação (segundos)
-  silence_duration: 2.0
+  silence_duration: 2
 
   # VAD (Voice Activity Detection)
   vad:
@@ -36,11 +36,10 @@ audio:
 whisper:
   # Modelo: tiny, base, small, medium, large
   # Para Pi Zero 2W: use "tiny" ou "base"
-  # Para Pi 4+: pode usar "small"
-  model: "tiny"
+  model: tiny
 
   # Idioma: pt, en, es, etc. (vazio = auto-detect)
-  language: "pt"
+  language: pt
 
   # Usar whisper.cpp (mais rápido) ou whisper Python
   use_cpp: true
@@ -50,7 +49,7 @@ whisper:
 
   # Quantização do modelo (para whisper.cpp)
   # Opções: f16, q8_0, q5_0, q4_0
-  quantization: "q5_0"
+  quantization: q5_0
 
   # Beam search size (menor = mais rápido)
   beam_size: 1
@@ -58,53 +57,73 @@ whisper:
   # Suprimir tokens de silêncio
   suppress_blank: true
 
+  # Provider: local, whisperapi, openai
+  provider: whisperapi
+
+  # Modo streaming (transcrição em tempo real)
+  stream_mode: false
+
+  # OpenAI Whisper API key
+  openai_api_key: ''
+
+  # WhisperAPI (servidor externo)
+  whisperapi_url: http://192.168.31.121:3001/
+  whisperapi_timeout: 10000
+  whisperapi_urls:
+    - http://192.168.31.120:3001/
+    - http://192.168.31.110:3001/
+    - http://192.168.31.101:3001/
+    - http://192.168.31.100:3001/
+
 # Configuração do LLM (Resumo/Processamento)
 llm:
-  # Provider: local, openai, anthropic, ollama
-  provider: "local"
+  # Provider: local, openai, anthropic, ollama, chatmock
+  provider: chatmock
 
   # Configuração Local (llama.cpp)
   local:
     # Modelo: tinyllama, phi2, gemma-2b
-    model: "tinyllama"
-
+    model: tinyllama
     # Caminho do modelo (se custom)
-    model_path: ""
-
+    model_path: ''
     # Contexto máximo
     context_size: 512
-
     # Threads
     threads: 4
-
     # Tokens máximos na resposta
     max_tokens: 150
-
     # Temperatura (0 = determinístico)
     temperature: 0.3
-
     # Quantização
-    quantization: "q4_0"
+    quantization: q4_0
 
   # Configuração OpenAI
   openai:
-    api_key: "${OPENAI_API_KEY}"
-    model: "gpt-4o-mini"
+    api_key: ${OPENAI_API_KEY}
+    model: gpt-4o-mini
     max_tokens: 200
     temperature: 0.3
 
   # Configuração Anthropic
   anthropic:
-    api_key: "${ANTHROPIC_API_KEY}"
-    model: "claude-3-haiku-20240307"
+    api_key: ${ANTHROPIC_API_KEY}
+    model: claude-3-haiku-20240307
     max_tokens: 200
     temperature: 0.3
 
   # Configuração Ollama (servidor local)
   ollama:
-    host: "http://localhost:11434"
-    model: "tinyllama"
+    host: http://localhost:11434
+    model: tinyllama
     max_tokens: 200
+
+  # Configuração ChatMock (GPT-5 local)
+  chatmock:
+    base_url: http://192.168.31.29:8000/v1
+    model: gpt-5
+    reasoning_effort: medium
+    max_tokens: 500
+    enable_web_search: false
 
 # Prompts para o LLM
 prompts:
@@ -125,7 +144,7 @@ prompts:
     Ações:
 
   # Prompt customizado
-  custom: ""
+  custom: ''
 
 # Sistema
 system:
@@ -133,14 +152,14 @@ system:
   cache_enabled: true
 
   # Diretório de cache
-  cache_dir: "~/.cache/voice-processor"
+  cache_dir: ~/.cache/voice-processor
 
   # Tempo de vida do cache (segundos)
   cache_ttl: 3600
 
   # Logging
-  log_level: "INFO"
-  log_file: ""
+  log_level: DEBUG
+  log_file: ''
 
   # Modo de baixa memória (para Pi Zero 2W)
   low_memory_mode: true
@@ -148,10 +167,17 @@ system:
   # Tempo máximo de processamento (segundos)
   timeout: 60
 
+  # Logs em memória para UI web
+  memory_logs_enabled: true
+
+  # Limitador de CPU (previne travamento)
+  cpu_limit_enabled: true
+  cpu_limit_percent: 94
+
 # Hardware
 hardware:
   # Tipo de ReSpeaker: 2mic, 4mic, 6mic
-  respeaker_type: "2mic"
+  respeaker_type: 2mic
 
   # Habilitar LEDs do ReSpeaker
   led_enabled: true
@@ -167,19 +193,19 @@ offline_queue:
   enabled: true
 
   # Caminho do banco de dados SQLite
-  db_path: "~/.cache/voice-processor/queue.db"
+  db_path: ~/.cache/voice-processor/queue.db
 
   # Tamanho máximo da fila
   max_queue_size: 1000
 
   # Delay base para retry (segundos)
-  retry_delay_base: 30.0
+  retry_delay_base: 30
 
   # Máximo de retries por tarefa
   max_retries: 3
 
   # Intervalo de verificação de conectividade (segundos)
-  connectivity_check_interval: 60.0
+  connectivity_check_interval: 60
 
   # Processar fila automaticamente quando voltar online
   auto_process_on_reconnect: true
@@ -192,52 +218,52 @@ offline_queue:
 # =============================================================================
 power_management:
   # *** FEATURE TOGGLE - Habilitar gerenciamento de energia ***
-  enabled: false
+  enabled: true
 
   # Modo padrão: performance, balanced, power_save, ultra_power_save
-  default_mode: "balanced"
+  default_mode: ultra_power_save
 
   # Modo automático (ajusta baseado em atividade e temperatura)
   auto_adjust: true
 
   # Tempo de inatividade para entrar em modo idle (segundos)
-  idle_timeout: 60.0
+  idle_timeout: 60
 
   # Modo quando idle
-  idle_mode: "power_save"
+  idle_mode: power_save
 
   # Limites de temperatura para throttling automático
   thermal:
     # Temperatura para reduzir performance (Celsius)
-    threshold_high: 70.0
+    threshold_high: 70
     # Temperatura crítica (Celsius)
-    threshold_critical: 80.0
+    threshold_critical: 80
 
   # Configurações por modo
   profiles:
     performance:
-      cpu_governor: "performance"
+      cpu_governor: performance
       cpu_freq_max: null  # Sem limite
       disable_hdmi: false
       disable_bluetooth: false
       led_brightness: 255
 
     balanced:
-      cpu_governor: "ondemand"
+      cpu_governor: ondemand
       cpu_freq_max: null
       disable_hdmi: false
       disable_bluetooth: false
       led_brightness: 128
 
     power_save:
-      cpu_governor: "powersave"
+      cpu_governor: powersave
       cpu_freq_max: 600  # MHz
       disable_hdmi: true
       disable_bluetooth: true
       led_brightness: 32
 
     ultra_power_save:
-      cpu_governor: "powersave"
+      cpu_governor: powersave
       cpu_freq_max: 400  # MHz
       disable_hdmi: true
       disable_bluetooth: true
@@ -251,7 +277,7 @@ web_interface:
   enabled: false
 
   # Host e porta do servidor
-  host: "0.0.0.0"
+  host: 0.0.0.0
   port: 8080
 
   # Modo debug (não usar em produção)
@@ -260,12 +286,68 @@ web_interface:
   # Autenticação básica (opcional)
   auth:
     enabled: false
-    username: "admin"
+    username: admin
     # Senha hash - gere com: python -c "import hashlib; print(hashlib.sha256(b'sua_senha').hexdigest())"
-    password_hash: ""
+    password_hash: ''
 
   # CORS (para acesso de outros dispositivos)
   cors_enabled: true
 
   # Rate limiting (requisições por minuto)
   rate_limit: 60
+
+  # Auto-refresh da UI
+  auto_refresh: true
+  refresh_interval: 30000
+
+# =============================================================================
+# USB Receiver / Escuta Contínua
+# =============================================================================
+usb_receiver:
+  # Habilitar escuta via ReSpeaker
+  enabled: true
+
+  # Escuta contínua automática (24/7)
+  continuous_listen: true
+
+  # Auto-iniciar ao abrir aplicação
+  auto_start: true
+
+  # Auto-processar arquivos (batch)
+  auto_process: true
+
+  # USB Gadget mode (receber áudio via USB)
+  usb_gadget_enabled: false
+
+  # Diretório para salvar gravações
+  save_directory: ~/audio-recordings
+
+  # Taxa de amostragem
+  sample_rate: 16000
+
+  # Canais de áudio
+  channels: 2
+
+  # Duração máxima por arquivo (segundos)
+  max_audio_duration: 10
+
+  # Transcrever automaticamente com Whisper
+  auto_transcribe: true
+
+  # Gerar resumo automático com LLM
+  auto_summarize: false
+
+  # Duração mínima para processar (segundos)
+  min_audio_duration: 3
+
+  # Dividir gravação quando detectar silêncio
+  silence_split: true
+
+  # Tempo de silêncio para dividir (segundos)
+  silence_threshold: 2
+
+  # Processar quando USB desconectar
+  process_on_disconnect: false
+
+  # Manter arquivo de áudio original após processar
+  keep_original_audio: false
