@@ -159,10 +159,14 @@ class TranscriptionStore:
 
     def append_to_daily_txt(self, record: TranscriptionRecord) -> str:
         """
-        Adiciona transcrição ao arquivo TXT diário de forma incremental.
+        Adiciona transcrição ao arquivo TXT diário, mantendo ordem cronológica.
 
         Arquivo: DDMMYYYY.txt (ex: 25122025.txt)
         Local: ~/audio-recordings/daily/
+
+        As transcrições são ordenadas pelo timestamp do áudio original,
+        não pela hora de processamento. Isso garante que reprocessamentos
+        fiquem na posição temporal correta.
 
         Args:
             record: Registro de transcrição
@@ -170,34 +174,63 @@ class TranscriptionStore:
         Returns:
             Caminho do arquivo TXT
         """
+        import re
+
         # Determinar a data (usa timestamp do record ou data atual)
         if record.timestamp:
             target_date = record.timestamp.date()
+            record_ts = record.timestamp
         else:
             target_date = date.today()
+            record_ts = datetime.now()
 
         # Nome do arquivo no formato DDMMYYYY.txt
         filename = target_date.strftime("%d%m%Y") + ".txt"
         filepath = self.consolidation_dir / filename
 
-        # Formatar hora
-        if record.timestamp:
-            time_str = record.timestamp.strftime("%H:%M:%S")
-        else:
-            time_str = datetime.now().strftime("%H:%M:%S")
+        # Criar nova entrada
+        new_entry = self._format_daily_entry(record, record_ts)
 
-        # Formatar duração
+        # Ler entradas existentes
+        existing_entries = []
+        if filepath.exists():
+            existing_entries = self._parse_daily_entries(filepath)
+
+        # Verificar se já existe entrada com mesmo ID (evitar duplicatas)
+        existing_entries = [e for e in existing_entries if e.get("id") != record.id]
+
+        # Adicionar nova entrada
+        existing_entries.append({
+            "id": record.id,
+            "timestamp": record_ts,
+            "content": new_entry,
+        })
+
+        # Ordenar por timestamp (mais antigo primeiro)
+        existing_entries.sort(key=lambda x: x["timestamp"])
+
+        # Reescrever arquivo ordenado
+        with open(filepath, "w", encoding="utf-8") as f:
+            for entry in existing_entries:
+                f.write(entry["content"])
+
+        logger.debug(f"Transcrição adicionada ao TXT diário (ordenado): {filepath}")
+        return str(filepath)
+
+    def _format_daily_entry(self, record: TranscriptionRecord, timestamp: datetime) -> str:
+        """Formata uma entrada para o arquivo TXT diário."""
+        time_str = timestamp.strftime("%H:%M:%S")
+        iso_str = timestamp.isoformat()
         duration_str = f"{record.duration_seconds:.1f}s" if record.duration_seconds else "N/A"
 
-        # Montar entrada
         entry_lines = [
             "=" * 80,
-            f"[{time_str}] Duração: {duration_str} | Processado por: {record.processed_by}",
+            f"[{time_str}] @{iso_str} | Duração: {duration_str} | {record.processed_by}",
+            f"# ID: {record.id}",
             "-" * 80,
             record.text.strip() if record.text else "(sem texto)",
         ]
 
-        # Adicionar resumo se existir
         if record.summary:
             entry_lines.extend([
                 "",
@@ -205,16 +238,74 @@ class TranscriptionStore:
                 record.summary.strip(),
             ])
 
-        entry_lines.append("")  # Linha em branco final
+        entry_lines.append("")
+        return "\n".join(entry_lines) + "\n"
 
-        entry_text = "\n".join(entry_lines) + "\n"
+    def _parse_daily_entries(self, filepath: Path) -> List[Dict[str, Any]]:
+        """Parseia entradas existentes de um arquivo TXT diário."""
+        import re
 
-        # Escrever de forma incremental (append)
-        with open(filepath, "a", encoding="utf-8") as f:
-            f.write(entry_text)
+        entries = []
+        content = filepath.read_text(encoding="utf-8")
 
-        logger.debug(f"Transcrição adicionada ao TXT diário: {filepath}")
-        return str(filepath)
+        # Dividir por separador de entrada
+        raw_entries = content.split("=" * 80)
+
+        for raw in raw_entries:
+            raw = raw.strip()
+            if not raw:
+                continue
+
+            # Extrair timestamp ISO do formato: [HH:MM:SS] @2025-12-25T14:30:00 | ...
+            ts_match = re.search(r"@(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2})", raw)
+            id_match = re.search(r"# ID: ([a-f0-9-]+)", raw)
+
+            if ts_match:
+                try:
+                    ts = datetime.fromisoformat(ts_match.group(1))
+                    entry_id = id_match.group(1) if id_match else str(uuid.uuid4())
+                    entries.append({
+                        "id": entry_id,
+                        "timestamp": ts,
+                        "content": "=" * 80 + "\n" + raw + "\n",
+                    })
+                except ValueError:
+                    # Timestamp inválido, manter entrada com timestamp antigo
+                    entries.append({
+                        "id": str(uuid.uuid4()),
+                        "timestamp": datetime.min,
+                        "content": "=" * 80 + "\n" + raw + "\n",
+                    })
+            else:
+                # Entrada antiga sem timestamp ISO, tentar extrair hora
+                time_match = re.search(r"\[(\d{2}:\d{2}:\d{2})\]", raw)
+                if time_match:
+                    try:
+                        # Usar data do arquivo + hora extraída
+                        date_match = re.search(r"(\d{2})(\d{2})(\d{4})", filepath.stem)
+                        if date_match:
+                            d, m, y = date_match.groups()
+                            h, mi, s = time_match.group(1).split(":")
+                            ts = datetime(int(y), int(m), int(d), int(h), int(mi), int(s))
+                        else:
+                            ts = datetime.now().replace(
+                                hour=int(time_match.group(1).split(":")[0]),
+                                minute=int(time_match.group(1).split(":")[1]),
+                                second=int(time_match.group(1).split(":")[2])
+                            )
+                        entries.append({
+                            "id": str(uuid.uuid4()),
+                            "timestamp": ts,
+                            "content": "=" * 80 + "\n" + raw + "\n",
+                        })
+                    except (ValueError, IndexError):
+                        entries.append({
+                            "id": str(uuid.uuid4()),
+                            "timestamp": datetime.min,
+                            "content": "=" * 80 + "\n" + raw + "\n",
+                        })
+
+        return entries
     
     def get(self, id: str) -> Optional[TranscriptionRecord]:
         """Obtém transcrição por ID."""
