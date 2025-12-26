@@ -1139,18 +1139,35 @@ function renderTranscriptionItems(segments) {
         return;
     }
 
-    container.innerHTML = segments.slice().reverse().map(seg => `
-        <div class="transcription-item" data-id="${seg.timestamp}">
-            <div class="timestamp">${new Date(seg.timestamp).toLocaleString('pt-BR')}</div>
+    container.innerHTML = segments.slice().reverse().map(seg => {
+        // Determinar status e ícone
+        const isSuccess = seg.success !== false;
+        const statusIcon = isSuccess ? '✅' : '❌';
+        const statusClass = isSuccess ? 'success' : 'error';
+
+        // Extrair IP do servidor para exibição compacta
+        const serverDisplay = seg.server_name || seg.server_url?.match(/\d+\.\d+\.\d+\.\d+/)?.[0] || 'local';
+        const serverBadge = serverDisplay !== 'local'
+            ? `<span class="server-badge" title="${seg.server_url || ''}">${serverDisplay}</span>`
+            : '<span class="server-badge local">local</span>';
+
+        return `
+        <div class="transcription-item ${statusClass}" data-id="${seg.timestamp}">
+            <div class="item-header">
+                <span class="timestamp">${new Date(seg.timestamp).toLocaleString('pt-BR')}</span>
+                <span class="status-icon">${statusIcon}</span>
+                ${serverBadge}
+            </div>
             <div class="text">${seg.text || '[Sem texto]'}</div>
             ${seg.summary ? `<div class="summary">📋 ${seg.summary}</div>` : ''}
+            ${seg.error_message ? `<div class="error-detail">⚠️ ${seg.error_message}</div>` : ''}
             <div class="meta">
-                ⏱️ ${seg.audio_duration?.toFixed(1)}s | 
-                ⚡ ${seg.processing_time?.toFixed(1)}s
+                ⏱️ ${seg.audio_duration?.toFixed(1) || '?'}s |
+                ⚡ ${seg.processing_time?.toFixed(1) || '?'}s
                 ${seg.audio_file ? `| 🎵 <a href="#" onclick="playAudio('${seg.audio_file}')">${seg.audio_file.split('/').pop()}</a>` : ''}
             </div>
         </div>
-    `).join('');
+    `}).join('');
 }
 
 function updateTranscriptionCount(count) {
