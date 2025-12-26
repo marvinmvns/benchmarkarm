@@ -3,46 +3,57 @@
 
 # Core
 PyYAML>=6.0
-python-dotenv>=1.0.0
 
 # Áudio
 pyaudio>=0.2.14
-sounddevice>=0.4.6
-soundfile>=0.12.1
 numpy>=1.24.0
 
 # VAD (Voice Activity Detection)
 webrtcvad>=2.0.10
 
-# Whisper Python (fallback se whisper.cpp não disponível)
-# openai-whisper>=20231117  # Comentado: muito pesado para Pi Zero
-
-# Para usar Whisper via binding Python
-# whispercpp>=0.0.17
-
 # LLM APIs
 openai>=1.0.0
 anthropic>=0.18.0
 httpx>=0.25.0
-requests>=2.31.0
-
-# Utilitários
-rich>=13.0.0
-click>=8.1.0
-pydantic>=2.0.0
-cachetools>=5.3.0
 
 # Sistema e Monitoramento
 psutil>=5.9.0
 
-# Interface Web (opcional - habilite web_interface.enabled no config)
+# Interface Web
 flask>=3.0.0
 
-# Opcional: GPIO para LEDs do ReSpeaker
-RPi.GPIO>=0.7.1
-spidev>=3.6
+# GPIO para LEDs do ReSpeaker (apenas no Raspberry Pi)
+RPi.GPIO>=0.7.1; platform_system == "Linux"
+spidev>=3.6; platform_system == "Linux"
 
-# Opcional: Faster Whisper (mais rápido que whisper original)
+# =============================================================================
+# Opcional (não usadas atualmente, mas podem ser úteis)
+# =============================================================================
+
+# Alternativa ao pyaudio
+# sounddevice>=0.4.6
+# soundfile>=0.12.1
+
+# Cliente HTTP alternativo
+# requests>=2.31.0
+
+# CLI e formatação (para futuras melhorias)
+# rich>=13.0.0
+# click>=8.1.0
+
+# Validação de dados (para futuras melhorias)
+# pydantic>=2.0.0
+
+# Cache avançado (para futuras melhorias)
+# cachetools>=5.3.0
+
+# Variáveis de ambiente (para futuras melhorias)
+# python-dotenv>=1.0.0
+
+# Whisper Python (fallback se whisper.cpp não disponível)
+# openai-whisper>=20231117  # Muito pesado para Pi Zero
+
+# Faster Whisper (mais rápido que whisper original)
 # faster-whisper>=0.10.0
 
 # Desenvolvimento
