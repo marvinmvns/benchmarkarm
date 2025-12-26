@@ -486,13 +486,77 @@ async function refreshQueueStats() {
 
 async function refreshPowerStatus() {
     try {
-        const status = await apiGet('power/status');
+        const resp = await apiGet('power/status');
+        const status = resp.status || resp;
+        const el = $('#power_status_text');
+        if (!el) return;
 
-        $('#power-current-mode').textContent = status.current_mode || '-';
-        $('#power-temp').textContent = status.temperature || '-';
-        $('#power-idle').textContent = status.is_idle ? 'Sim' : 'Não';
+        if (status.feature_enabled) {
+            const temp = status.temperature ? `${status.temperature.toFixed(1)}°C` : 'N/A';
+            const mode = status.current_mode || 'balanced';
+            const modeNames = {
+                'performance': '🚀 Performance',
+                'balanced': '⚖️ Balanceado',
+                'power_save': '🔋 Economia',
+                'ultra_power_save': '🌙 Ultra Economia'
+            };
+            el.innerHTML = `<strong style="color: #4CAF50;">✓ Ativo</strong> | Modo: ${modeNames[mode] || mode} | Temp: ${temp}`;
+        } else {
+            el.innerHTML = `<span style="color: #888;">Desabilitado</span>`;
+        }
     } catch (error) {
         console.error('Erro ao obter status de energia:', error);
+        const el = $('#power_status_text');
+        if (el) el.textContent = 'Erro ao obter status';
+    }
+}
+
+async function setPowerMode(mode) {
+    try {
+        await apiPost('power/mode', { mode: mode });
+        showNotification(`Modo de energia alterado para: ${mode}`, 'success');
+        refreshPowerStatus();
+    } catch (error) {
+        console.error('Erro ao definir modo de energia:', error);
+        showNotification('Erro ao alterar modo de energia', 'error');
+    }
+}
+
+async function refreshQueueStatus() {
+    try {
+        const resp = await apiGet('queue/status');
+        const status = resp.status || resp;
+        const el = $('#queue_status_text');
+        if (!el) return;
+
+        const online = status.is_online;
+        const pending = status.pending || 0;
+        const onlineIcon = online ? '🟢 Online' : '🔴 Offline';
+
+        if (pending > 0) {
+            el.innerHTML = `${onlineIcon} | <strong style="color: #FFC107;">${pending} áudios na fila</strong>`;
+        } else {
+            el.innerHTML = `${onlineIcon} | Fila vazia`;
+        }
+    } catch (error) {
+        console.error('Erro ao obter status da fila:', error);
+        const el = $('#queue_status_text');
+        if (el) el.textContent = 'Erro ao obter status';
+    }
+}
+
+async function processOfflineQueue() {
+    try {
+        const result = await apiPost('queue/process', {});
+        if (result.success) {
+            showNotification(`Processados ${result.processed || 0} itens da fila`, 'success');
+        } else {
+            showNotification(result.message || 'Não foi possível processar', 'warning');
+        }
+        refreshQueueStatus();
+    } catch (error) {
+        console.error('Erro ao processar fila:', error);
+        showNotification('Erro ao processar fila offline', 'error');
     }
 }
 
@@ -2612,4 +2676,10 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Auto-refresh batch status every 60s
     setInterval(refreshBatchStatus, 60000);
+
+    // Power Management and Offline Queue status
+    refreshPowerStatus();
+    refreshQueueStatus();
+    setInterval(refreshPowerStatus, 30000);
+    setInterval(refreshQueueStatus, 30000);
 });

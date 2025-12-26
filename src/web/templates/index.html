@@ -128,6 +128,60 @@
                         <span id="cpu_limit_value">85</span>%
                         <small>50-95%. Menor = mais lento, menos chance de travar</small>
                     </div>
+
+                    <hr style="margin: 20px 0; border-color: #333;">
+                    <h3>🔋 Economia de Energia</h3>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="power_enabled" name="power_management.enabled">
+                            Habilitar Economia de Energia
+                        </label>
+                        <small>Reduz clock/consumo do Raspberry Pi para economizar energia</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="power_mode">Modo de Energia</label>
+                        <select id="power_mode" name="power_management.default_mode" onchange="setPowerMode(this.value)">
+                            <option value="performance">🚀 Performance (máximo desempenho)</option>
+                            <option value="balanced">⚖️ Balanceado (recomendado)</option>
+                            <option value="power_save">🔋 Economia (baixo consumo)</option>
+                            <option value="ultra_power_save">🌙 Ultra Economia (mínimo consumo)</option>
+                        </select>
+                        <small>Ultra Economia: ~500mW | Performance: ~1800mW</small>
+                    </div>
+
+                    <div id="power_status_card" class="status-card" style="margin-top: 10px; padding: 10px; background: #1a1a2e; border-radius: 8px;">
+                        <span id="power_status_text">Status: Verificando...</span>
+                    </div>
+
+                    <hr style="margin: 20px 0; border-color: #333;">
+                    <h3>📡 Fila Offline (Sem Internet)</h3>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="offline_queue_enabled" name="offline_queue.enabled" checked>
+                            Habilitar Fila Offline
+                        </label>
+                        <small>Guarda áudios quando sem internet para processar depois</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label>
+                            <input type="checkbox" id="offline_local_fallback" name="offline_queue.use_local_fallback" checked>
+                            Fallback Local
+                        </label>
+                        <small>Usa whisper.cpp local se não houver internet (mais lento)</small>
+                    </div>
+
+                    <div id="queue_status_card" class="status-card" style="margin-top: 10px; padding: 10px; background: #1a1a2e; border-radius: 8px;">
+                        <div style="display: flex; justify-content: space-between; align-items: center;">
+                            <span id="queue_status_text">Status: Verificando...</span>
+                            <button onclick="processOfflineQueue()" class="btn btn-small" style="padding: 5px 10px;">
+                                Processar Fila
+                            </button>
+                        </div>
+                    </div>
                 </div>
             </section>
 

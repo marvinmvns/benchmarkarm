@@ -23,6 +23,7 @@ from typing import List, Optional, Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..transcription.job_manager import JobManager
+    from .queue import OfflineQueue
 
 from .transcription_store import get_transcription_store, TranscriptionRecord
 
@@ -113,6 +114,7 @@ class BatchProcessor:
         # Componentes (lazy loaded)
         self._transcriber = None
         self._job_manager: Optional["JobManager"] = None
+        self._offline_queue: Optional["OfflineQueue"] = None
 
         # Callbacks
         self._on_file_processed: Optional[Callable] = None
@@ -127,6 +129,20 @@ class BatchProcessor:
             except Exception as e:
                 logger.warning(f"JobManager não disponível: {e}")
                 self._job_manager = None
+
+        # Tentar inicializar OfflineQueue
+        try:
+            from .queue import OfflineQueue, TaskType
+            self._offline_queue = OfflineQueue()
+            # Registrar handler para processar tarefas de transcrição da fila
+            self._offline_queue.register_handler(
+                TaskType.TRANSCRIPTION,
+                self._process_queued_transcription
+            )
+            logger.info("📥 BatchProcessor integrado com OfflineQueue")
+        except Exception as e:
+            logger.warning(f"OfflineQueue não disponível: {e}")
+            self._offline_queue = None
 
         logger.info(f"BatchProcessor inicializado: dir={self.audio_dir}")
     
@@ -434,17 +450,24 @@ class BatchProcessor:
                     return True
                     
                 except Exception as e:
-                    logger.warning(f"Tentativa {attempt+1}/{retries} falhou para {wav_path.name}: {e}")
+                    error_msg = str(e)
+                    logger.warning(f"Tentativa {attempt+1}/{retries} falhou para {wav_path.name}: {error_msg}")
                     if attempt < retries - 1:
                         time.sleep(delay)
                         delay *= 2
                     else:
-                        logger.error(f"❌ Erro ao processar após retries: {e}")
+                        logger.error(f"❌ Erro ao processar após retries: {error_msg}")
                         self._stats.failed_files += 1
                         self._failed_files.append(wav_path.name)
+
+                        # Tentar enfileirar para processar depois (especialmente para erros de rede)
+                        if self._is_network_error(error_msg):
+                            if self._enqueue_for_later(wav_path, error_msg):
+                                logger.info(f"📥 {wav_path.name} enfileirado para processar quando online")
+
                         if self._on_error:
-                            self._on_error(wav_path.name, str(e))
-            
+                            self._on_error(wav_path.name, error_msg)
+
             return False
             
         finally:
@@ -488,7 +511,7 @@ class BatchProcessor:
     ) -> str:
         """Formata transcrição com metadados."""
         now = datetime.now()
-        
+
         content = f"""# Transcrição: {wav_name}
 # Data: {now.strftime('%Y-%m-%d %H:%M:%S')}
 # Timestamp: {now.isoformat()}
@@ -500,7 +523,79 @@ class BatchProcessor:
 {text.strip()}
 """
         return content
-    
+
+    def _process_queued_transcription(self, payload: dict) -> dict:
+        """
+        Processa transcrição da fila offline.
+
+        Args:
+            payload: Dados da tarefa (audio_path, etc)
+
+        Returns:
+            Resultado do processamento
+        """
+        audio_path = payload.get("audio_path")
+        if not audio_path:
+            raise ValueError("audio_path não especificado no payload")
+
+        wav_path = Path(audio_path)
+        if not wav_path.exists():
+            raise FileNotFoundError(f"Arquivo não encontrado: {audio_path}")
+
+        logger.info(f"📥 Processando da fila: {wav_path.name}")
+
+        # Processar o arquivo
+        success = self.process_file(wav_path)
+
+        return {
+            "success": success,
+            "file": wav_path.name,
+            "processed_at": datetime.now().isoformat(),
+        }
+
+    def _enqueue_for_later(self, wav_path: Path, error_msg: str) -> bool:
+        """
+        Enfileira arquivo para processamento posterior.
+
+        Args:
+            wav_path: Caminho do arquivo
+            error_msg: Mensagem de erro que causou o enfileiramento
+
+        Returns:
+            True se enfileirado com sucesso
+        """
+        if not self._offline_queue or not self._offline_queue.enabled:
+            return False
+
+        try:
+            from .queue import TaskType
+
+            task_id = self._offline_queue.enqueue(
+                TaskType.TRANSCRIPTION,
+                payload={
+                    "audio_path": str(wav_path),
+                    "original_error": error_msg,
+                    "queued_at": datetime.now().isoformat(),
+                },
+                priority=1,  # Prioridade média
+            )
+            logger.info(f"📥 Arquivo enfileirado para processar depois: {wav_path.name} (task={task_id[:8]})")
+            return True
+        except Exception as e:
+            logger.warning(f"Erro ao enfileirar: {e}")
+            return False
+
+    def _is_network_error(self, error_msg: str) -> bool:
+        """Verifica se o erro é relacionado a rede/conectividade."""
+        network_keywords = [
+            "connection", "timeout", "network", "unreachable",
+            "refused", "reset", "failed to connect", "no route",
+            "dns", "resolve", "socket", "http", "ssl",
+            "conexão", "rede", "tempo esgotado", "não disponível"
+        ]
+        error_lower = error_msg.lower()
+        return any(kw in error_lower for kw in network_keywords)
+
     def process_pending(self, max_files: Optional[int] = None) -> int:
         """
         Processa arquivos pendentes.

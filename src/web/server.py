@@ -174,13 +174,13 @@ class ContinuousListener(threading.Thread):
         self.config_path = config_path
         self.led_controller = led_controller
         self.running = False
-        self.active = False 
+        self.active = False
         self.processor = None
-        
+
     def run(self):
         self.running = True
         logger.info("🎧 Thread de escuta contínua iniciada (Aguardando ativação)")
-        
+
         while self.running:
             if self.active:
                 try:
@@ -188,57 +188,54 @@ class ContinuousListener(threading.Thread):
                         from src.pipeline import VoiceProcessor
                         self.processor = VoiceProcessor(config_path=self.config_path)
                         logger.info("🎤 Microfone ativado para escuta contínua")
-                
-                    # Feedback visual de "Ouvindo" é tratado pelo VAD/Loop?
-                    # O VoiceProcessor não notifica "Ouvindo" exceto via callback?
-                    # Vamos assumir IDLE color (apagado) até detectar voz?
-                    # Ou Azul constante?
-                    # VoiceProcessor.process(audio=None) bloqueia gravando.
-                    
-                    # Se quisermos feedback de VAD, precisamos passar callback
+
+                    # LED: arco-íris enquanto escuta
+                    if self.led_controller:
+                        self.led_controller.listening()
+
+                    # Callback para feedback visual por estágio
                     def status_cb(stage, details):
-                        if not self.led_controller: return
+                        if not self.led_controller:
+                            return
                         if stage == "recording":
-                            pass # Azul piscando?
+                            self.led_controller.listening()  # Arco-íris
                         elif stage == "transcribing":
-                            self.led_controller.processing()
-                    
-                    # Indicar que está ativo (pode ser sutil)
-                    # self.led_controller.listening() # Pisca azul enquanto grava
-                    
+                            self.led_controller.processing()  # Amarelo/laranja girando
+
                     result = self.processor.process(
                         generate_summary=True,
                         status_callback=status_cb
                     )
-                    
+
                     if result.text.strip():
                         logger.info(f"🗣️: {result.text}")
-                        if self.led_controller: self.led_controller.success()
-                    
+                        # LED: verde para sucesso
+                        if self.led_controller:
+                            self.led_controller.success(duration=1.5)
+                    else:
+                        # Sem texto, voltar ao idle
+                        if self.led_controller:
+                            self.led_controller.idle()
+
                 except Exception as e:
                     logger.error(f"Erro na escuta: {e}")
-                    if self.led_controller: self.led_controller.error()
+                    # LED: vermelho piscando para erro
+                    if self.led_controller:
+                        self.led_controller.error(duration=2.0)
                     time.sleep(2)
             else:
-                 # Not active
-                 if self.processor:
-                     self.processor = None # __exit__ handles cleanup if used as context manager?
-                     # No, VoiceProcessor uses __enter__/__exit__.
-                     # Direct usage requires manual close?
-                     # VoiceProcessor implementation:
-                     # def __exit__(self, ...): self.audio.close()
-                     # So if I instantiate it without 'with', I should call close?
-                     # It doesn't seem to have explicit Close method except via context manager.
-                     # Let's check VoiceProcessor... 
-                     # Assuming I can just drop it and GC cleans up or I should fix VoiceProcessor later.
-                     # Ideally I used 'with' inside loop, but that creates overhead per phrase.
-                     # I'll rely on GC for now as AudioCapture closes stream in destructor?
-                     pass
-                 time.sleep(0.5)
+                # Não ativo - LED desligado
+                if self.led_controller:
+                    self.led_controller.idle()
+                if self.processor:
+                    self.processor = None
+                time.sleep(0.5)
 
     def stop(self):
         self.running = False
         self.active = False
+        if self.led_controller:
+            self.led_controller.idle()
 
 def create_app(config_path: Optional[str] = None) -> "Flask":
     """
@@ -641,14 +638,167 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
+    # ==========================================================================
+    # Power Management - Economia de Energia
+    # ==========================================================================
+
+    # Instância global do PowerManager
+    _power_manager = None
+
+    def get_power_manager():
+        """Obtém instância do PowerManager."""
+        nonlocal _power_manager
+        if _power_manager is None:
+            try:
+                from ..utils.power import AdaptivePowerManager
+                config = load_config()
+                pm_config = config.get('power_management', {})
+                _power_manager = AdaptivePowerManager(
+                    enabled=pm_config.get('enabled', False),
+                    default_mode=pm_config.get('default_mode', 'balanced'),
+                )
+            except Exception as e:
+                logger.warning(f"PowerManager não disponível: {e}")
+                return None
+        return _power_manager
+
     @app.route("/api/power/status", methods=["GET"])
     def power_status():
         """Retorna status de energia."""
         try:
-            from ..utils.power import PowerManager
-            pm = PowerManager(enabled=False)  # Apenas para status
-            status = pm.get_status()
-            return jsonify(status)
+            pm = get_power_manager()
+            if pm:
+                status = pm.get_status()
+                status['feature_enabled'] = pm.enabled
+                return jsonify({"success": True, "status": status})
+            else:
+                return jsonify({
+                    "success": True,
+                    "status": {
+                        "feature_enabled": False,
+                        "is_raspberry_pi": False,
+                        "message": "Power Management não disponível neste dispositivo"
+                    }
+                })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/power/enable", methods=["POST"])
+    def power_enable():
+        """Habilita/desabilita power management."""
+        try:
+            data = request.get_json() or {}
+            enabled = data.get('enabled', True)
+
+            pm = get_power_manager()
+            if pm:
+                pm.enabled = enabled
+                if enabled:
+                    pm.set_mode(pm.current_mode or 'balanced')
+                logger.info(f"Power Management {'habilitado' if enabled else 'desabilitado'}")
+                return jsonify({"success": True, "enabled": enabled})
+            else:
+                return jsonify({"error": "Power Manager não disponível"}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/power/mode", methods=["POST"])
+    def power_set_mode():
+        """Define modo de energia."""
+        try:
+            data = request.get_json() or {}
+            mode = data.get('mode', 'balanced')
+
+            pm = get_power_manager()
+            if pm:
+                if not pm.enabled:
+                    pm.enabled = True
+                pm.set_mode(mode)
+                logger.info(f"Modo de energia alterado para: {mode}")
+                return jsonify({"success": True, "mode": mode})
+            else:
+                return jsonify({"error": "Power Manager não disponível"}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    # ==========================================================================
+    # Offline Queue - Fila de áudios sem internet
+    # ==========================================================================
+
+    # Instância global da OfflineQueue
+    _offline_queue = None
+
+    def get_offline_queue():
+        """Obtém instância da OfflineQueue."""
+        nonlocal _offline_queue
+        if _offline_queue is None:
+            try:
+                from ..utils.queue import OfflineQueue
+                config = load_config()
+                queue_config = config.get('offline_queue', {})
+                _offline_queue = OfflineQueue(
+                    enabled=queue_config.get('enabled', True),
+                    max_queue_size=queue_config.get('max_queue_size', 1000),
+                    max_retries=queue_config.get('max_retries', 3),
+                )
+            except Exception as e:
+                logger.warning(f"OfflineQueue não disponível: {e}")
+                return None
+        return _offline_queue
+
+    @app.route("/api/queue/status", methods=["GET"])
+    def queue_status():
+        """Retorna status da fila offline."""
+        try:
+            queue = get_offline_queue()
+            if queue:
+                stats = queue.get_stats()
+                stats['feature_enabled'] = queue.enabled
+                stats['is_online'] = queue.is_online
+                return jsonify({"success": True, "status": stats})
+            else:
+                return jsonify({
+                    "success": True,
+                    "status": {
+                        "feature_enabled": False,
+                        "pending": 0,
+                        "is_online": True,
+                        "message": "Offline Queue não configurada"
+                    }
+                })
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/queue/enable", methods=["POST"])
+    def queue_enable():
+        """Habilita/desabilita fila offline."""
+        try:
+            data = request.get_json() or {}
+            enabled = data.get('enabled', True)
+
+            queue = get_offline_queue()
+            if queue:
+                queue.enabled = enabled
+                logger.info(f"Offline Queue {'habilitada' if enabled else 'desabilitada'}")
+                return jsonify({"success": True, "enabled": enabled})
+            else:
+                return jsonify({"error": "Offline Queue não disponível"}), 400
+        except Exception as e:
+            return jsonify({"error": str(e)}), 500
+
+    @app.route("/api/queue/process", methods=["POST"])
+    def queue_process():
+        """Processa fila offline manualmente."""
+        try:
+            queue = get_offline_queue()
+            if queue:
+                if queue.is_online:
+                    processed = queue.process_pending()
+                    return jsonify({"success": True, "processed": processed})
+                else:
+                    return jsonify({"success": False, "message": "Sem conexão com internet"})
+            else:
+                return jsonify({"error": "Offline Queue não disponível"}), 400
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 

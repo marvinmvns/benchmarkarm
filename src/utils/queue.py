@@ -80,6 +80,8 @@ class OfflineQueue:
         max_queue_size: int = 1000,
         retry_delay_base: float = 30.0,
         connectivity_check_interval: float = 60.0,
+        enabled: bool = True,
+        max_retries: int = 3,
     ):
         """
         Inicializa a fila offline.
@@ -89,11 +91,15 @@ class OfflineQueue:
             max_queue_size: Tamanho máximo da fila
             retry_delay_base: Delay base para retry (segundos)
             connectivity_check_interval: Intervalo de verificação de conectividade
+            enabled: Se a fila está habilitada
+            max_retries: Número máximo de tentativas por tarefa
         """
         self.db_path = Path(db_path).expanduser()
         self.max_queue_size = max_queue_size
         self.retry_delay_base = retry_delay_base
         self.connectivity_check_interval = connectivity_check_interval
+        self.enabled = enabled
+        self.default_max_retries = max_retries
 
         # Estado
         self._is_online = True
@@ -487,6 +493,62 @@ class OfflineQueue:
     def is_online(self) -> bool:
         """Retorna status de conectividade."""
         return self._is_online
+
+    def process_pending(self) -> int:
+        """
+        Processa tarefas pendentes manualmente.
+
+        Returns:
+            Número de tarefas processadas
+        """
+        if not self.enabled:
+            logger.warning("Fila offline desabilitada")
+            return 0
+
+        if not self._is_online:
+            logger.warning("Sem conexão - não é possível processar")
+            return 0
+
+        if self._processing:
+            logger.info("Processamento já em andamento")
+            return 0
+
+        self._processing = True
+        processed = 0
+
+        try:
+            tasks = self.get_pending_tasks(limit=100)
+
+            for task in tasks:
+                if not self._is_online:
+                    break
+
+                handler = self._task_handlers.get(task.task_type)
+                if not handler:
+                    logger.warning(f"Handler não encontrado para: {task.task_type}")
+                    self.update_task(task.id, TaskStatus.FAILED, error="Handler não encontrado")
+                    continue
+
+                self.update_task(task.id, TaskStatus.PROCESSING)
+
+                try:
+                    result = handler(task.payload)
+                    self.update_task(task.id, TaskStatus.COMPLETED, result=result)
+                    processed += 1
+
+                    if self._on_task_complete:
+                        self._on_task_complete(task, result)
+
+                except Exception as e:
+                    logger.error(f"Erro ao processar tarefa {task.id}: {e}")
+                    if not self.increment_retry(task.id):
+                        self.update_task(task.id, TaskStatus.FAILED, error=str(e))
+
+        finally:
+            self._processing = False
+
+        logger.info(f"Processadas {processed} tarefas da fila")
+        return processed
 
     def on_connectivity_change(self, callback: Callable[[bool], None]) -> None:
         """Registra callback para mudança de conectividade."""

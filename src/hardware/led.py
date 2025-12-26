@@ -252,12 +252,32 @@ class LEDController:
         self._set_color(self.COLORS['off'])
     
     def listening(self):
-        """Capturando áudio - LEDs piscando azul."""
+        """Capturando áudio - LEDs com animação colorida (arco-íris)."""
         if not self.enabled:
             return
         self._current_state = 'listening'
-        self._start_animation(self._animate_blink, self.COLORS['blue'], 0.3)
-        logger.debug("🔵 LEDs: modo listening (azul piscando)")
+        # Cores vibrantes para indicar escuta ativa
+        rainbow_colors = [
+            self.COLORS['blue'],
+            self.COLORS['purple'],
+            self.COLORS['green'],
+            self.COLORS['yellow'],
+            self.COLORS['orange'],
+            self.COLORS['red'],
+        ]
+        self._start_animation(self._animate_rainbow, rainbow_colors, 0.2)
+        logger.debug("🌈 LEDs: modo listening (arco-íris)")
+
+    def _animate_rainbow(self, colors: List[Tuple[int, int, int]], interval: float = 0.2):
+        """Animação arco-íris - cores rotacionando."""
+        color_idx = 0
+        while not self._stop_event.is_set():
+            for i in range(self.num_leds):
+                color = colors[(color_idx + i) % len(colors)]
+                self._apa102.set_pixel(i, *color)
+            self._apa102.show()
+            color_idx = (color_idx + 1) % len(colors)
+            self._stop_event.wait(interval)
     
     def processing(self):
         """Processando - LEDs girando amarelo/laranja."""
@@ -310,21 +330,21 @@ class LEDController:
         
         threading.Thread(target=reset, daemon=True).start()
     
-    def error(self, duration: float = 1.0):
-        """Erro - Vermelho por alguns segundos."""
+    def error(self, duration: float = 2.0):
+        """Erro - Vermelho piscando por alguns segundos."""
         if not self.enabled:
             return
         self._current_state = 'error'
-        self._stop_animation()
-        self._set_color(self.COLORS['red'])
-        logger.debug("🔴 LEDs: modo error (vermelho)")
-        
+        # Piscar vermelho rápido para indicar erro
+        self._start_animation(self._animate_blink, self.COLORS['red'], 0.15)
+        logger.debug("🔴 LEDs: modo error (vermelho piscando)")
+
         # Timer para voltar ao idle
         def reset():
             time.sleep(duration)
             if self._current_state == 'error':
                 self.idle()
-        
+
         threading.Thread(target=reset, daemon=True).start()
     
     def wakeup(self):
