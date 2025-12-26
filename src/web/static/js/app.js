@@ -374,10 +374,11 @@ function collectFormValues() {
     config.whisper.threads = parseInt($('#whisper_threads').value);
     config.whisper.beam_size = parseInt($('#whisper_beam_size').value);
     // Check both whisper_stream_mode (Settings tab) and whisper_stream (General tab)
+    // Use OR logic: if either is checked, save as true
     const whisperStreamMode = $('#whisper_stream_mode');
     const whisperStreamGeneral = $('#whisper_stream');
-    if (whisperStreamMode) config.whisper.stream_mode = whisperStreamMode.checked;
-    else if (whisperStreamGeneral) config.whisper.stream_mode = whisperStreamGeneral.checked;
+    const streamModeValue = (whisperStreamMode?.checked || false) || (whisperStreamGeneral?.checked || false);
+    config.whisper.stream_mode = streamModeValue;
     config.whisper.openai_api_key = $('#whisper_openai_api_key').value;
     config.whisper.whisperapi_url = $('#whisperapi_url').value;
 
@@ -912,6 +913,28 @@ function setupHardwareToggles() {
             updateRefreshIntervals(interval);
         });
     }
+
+    // Sync duplicate checkboxes between General and Settings tabs
+    const syncPairs = [
+        { general: 'whisper_stream', settings: 'whisper_stream_mode' },
+        { general: 'continuous_listen_enabled', settings: 'usb_receiver_enabled' },
+        { general: 'auto_transcribe', settings: 'usb_auto_transcribe' },
+        { general: 'batch_auto_process', settings: 'usb_auto_process' }
+    ];
+
+    syncPairs.forEach(({ general, settings }) => {
+        const generalEl = $(`#${general}`);
+        const settingsEl = $(`#${settings}`);
+
+        if (generalEl && settingsEl) {
+            generalEl.addEventListener('change', function() {
+                settingsEl.checked = this.checked;
+            });
+            settingsEl.addEventListener('change', function() {
+                generalEl.checked = this.checked;
+            });
+        }
+    });
 }
 
 async function testAudio() {
