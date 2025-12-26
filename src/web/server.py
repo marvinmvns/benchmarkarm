@@ -1794,21 +1794,8 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         except Exception as e:
             return jsonify({"error": str(e)}), 500
 
-    @app.route("/api/transcriptions", methods=["GET"])
-    def get_transcriptions():
-        """Retorna histórico de transcrições."""
-        limit = request.args.get("limit", 20, type=int)
-        return jsonify({
-            "success": True,
-            "transcriptions": transcription_history[-limit:][::-1],  # Mais recentes primeiro
-            "total": len(transcription_history)
-        })
-
-    @app.route("/api/transcriptions", methods=["DELETE"])
-    def clear_transcriptions():
-        """Limpa histórico de transcrições."""
-        transcription_history.clear()
-        return jsonify({"success": True, "message": "Histórico limpo"})
+    # NOTA: Rotas /api/transcriptions já definidas acima usando TranscriptionStore (SQLite)
+    # Não duplicar aqui - o histórico persistente está em ~/.cache/voice-processor/transcriptions.db
 
     @app.route("/api/record/start", methods=["POST"])
     def start_recording():
@@ -1853,9 +1840,30 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
                         status_callback=update_status
                     )
                     
-                    # Salvar resultado
+                    # Salvar resultado no SQLite (persistente)
+                    import uuid
+                    from datetime import datetime
+                    try:
+                        from ..utils.transcription_store import get_transcription_store, TranscriptionRecord
+                        store = get_transcription_store()
+                        record = TranscriptionRecord(
+                            id=str(uuid.uuid4()),
+                            timestamp=datetime.now(),
+                            duration_seconds=result.audio_duration,
+                            text=result.text,
+                            summary=result.summary,
+                            language=result.transcription.language if hasattr(result.transcription, 'language') else "pt",
+                            processed_by="manual",
+                        )
+                        store.save(record)
+                        transcription_id = record.id
+                        logger.info(f"Transcrição manual salva no SQLite: {record.id}")
+                    except Exception as e:
+                        logger.warning(f"Erro ao salvar no SQLite: {e}")
+                        transcription_id = str(len(transcription_history) + 1)
+
                     transcription_data = {
-                        "id": len(transcription_history) + 1,
+                        "id": transcription_id,
                         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                         "audio_duration": round(result.audio_duration, 1),
                         "text": result.text,
@@ -1863,7 +1871,7 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
                         "processing_time": round(result.total_time, 2),
                         "language": result.transcription.language if hasattr(result.transcription, 'language') else "pt",
                     }
-                    
+
                     transcription_history.append(transcription_data)
                     processor_state["current_transcription"] = transcription_data
                     
@@ -1927,18 +1935,40 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
                         generate_summary=True,
                         summary_style="concise"
                     )
-                    
+
+                    # Salvar no SQLite (persistente)
+                    import uuid
+                    from datetime import datetime
+                    try:
+                        from ..utils.transcription_store import get_transcription_store, TranscriptionRecord
+                        store = get_transcription_store()
+                        record = TranscriptionRecord(
+                            id=str(uuid.uuid4()),
+                            timestamp=datetime.now(),
+                            duration_seconds=result.audio_duration,
+                            text=result.text,
+                            summary=result.summary,
+                            language=result.transcription.language if hasattr(result.transcription, 'language') else "pt",
+                            processed_by="upload",
+                        )
+                        store.save(record)
+                        transcription_id = record.id
+                        logger.info(f"Transcrição upload salva no SQLite: {record.id}")
+                    except Exception as e:
+                        logger.warning(f"Erro ao salvar no SQLite: {e}")
+                        transcription_id = str(len(transcription_history) + 1)
+
                     transcription_data = {
-                        "id": len(transcription_history) + 1,
+                        "id": transcription_id,
                         "timestamp": time.strftime("%Y-%m-%d %H:%M:%S"),
                         "audio_duration": round(result.audio_duration, 1),
                         "text": result.text,
                         "summary": result.summary,
                         "processing_time": round(result.total_time, 2),
                     }
-                    
+
                     transcription_history.append(transcription_data)
-                    
+
                     return jsonify({
                         "success": True,
                         "transcription": transcription_data
