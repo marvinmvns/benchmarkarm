@@ -733,6 +733,8 @@ class WhisperAPIClient:
         translate: bool = False,
         cleanup: bool = True,
         use_job_manager: bool = True,
+        fallback_to_local: bool = True,
+        local_config: Optional[dict] = None,
     ):
         """
         Inicializa o cliente WhisperAPI com suporte a Round Robin inteligente.
@@ -746,6 +748,8 @@ class WhisperAPIClient:
             translate: Traduzir para inglês
             cleanup: Limpar arquivos temporários no servidor
             use_job_manager: Usar JobManager para tracking inteligente
+            fallback_to_local: Se True, usa whisper.cpp local quando todos os servidores API falharem
+            local_config: Configuração para o whisper.cpp local (opcional)
         """
         # Configurar URLs
         self.urls = base_urls or [base_url]
@@ -781,7 +785,30 @@ class WhisperAPIClient:
                 logger.warning(f"JobManager não disponível: {e}")
                 self._job_manager = None
 
+        # Fallback para whisper.cpp local
+        self.fallback_to_local = fallback_to_local
+        self.local_config = local_config or {}
+        self._local_transcriber = None  # Lazy initialization
+
         logger.info(f"🌐 WhisperAPI inicializado com {len(self.urls)} servidores: {self.urls}")
+        if fallback_to_local:
+            logger.info("🔄 Fallback para whisper.cpp local habilitado")
+
+    def _get_local_transcriber(self) -> "WhisperTranscriber":
+        """
+        Obtém instância do transcritor local (whisper.cpp).
+        Usa lazy initialization para não carregar o modelo até ser necessário.
+        """
+        if self._local_transcriber is None:
+            logger.info("🔧 Inicializando whisper.cpp local como fallback...")
+            self._local_transcriber = WhisperTranscriber(
+                model=self.local_config.get('model', 'tiny'),
+                language=self.language,
+                use_cpp=self.local_config.get('use_cpp', True),
+                threads=self.local_config.get('threads', 4),
+                beam_size=self.local_config.get('beam_size', 1),
+            )
+        return self._local_transcriber
     
     def _get_client_for_url(self, url: str):
         """Retorna ou cria client para uma URL específica."""
@@ -1587,7 +1614,57 @@ class WhisperAPIClient:
                 if remaining_servers > 0 or attempt < max_attempts - 1:
                     continue
 
-        # Todos os servidores falharam
+        # Todos os servidores API falharam - tentar fallback local
+        if self.fallback_to_local:
+            logger.warning(
+                f"⚠️ Todos os {len(self.urls)} servidores API falharam. "
+                f"Tentando fallback para whisper.cpp local..."
+            )
+            try:
+                local_transcriber = self._get_local_transcriber()
+                local_result = local_transcriber.transcribe(
+                    audio_path,
+                    language=language,
+                )
+
+                # Converter resultado local para formato compatível
+                result = {
+                    "result": {
+                        "text": local_result.text,
+                        "metadata": {
+                            "language": local_result.language,
+                            "duration": local_result.duration,
+                        },
+                        "processingTime": local_result.processing_time,
+                        "segments": local_result.segments,
+                    }
+                }
+
+                # Marcar como sucesso local
+                if self._job_manager and local_job_id:
+                    self._job_manager.mark_job_completed(
+                        local_job_id,
+                        text=local_result.text,
+                        metadata={"fallback": "local", "model": local_result.model},
+                    )
+
+                logger.info(f"✅ Fallback local bem-sucedido! ({local_result.processing_time:.1f}s)")
+                return result, "local://whisper.cpp"
+
+            except Exception as local_error:
+                logger.error(f"❌ Fallback local também falhou: {local_error}")
+                if self._job_manager and local_job_id:
+                    self._job_manager.mark_job_failed(
+                        local_job_id,
+                        f"Todos os servidores e fallback local falharam: {local_error}",
+                        can_retry=False,
+                    )
+                raise RuntimeError(
+                    f"Transcrição falhou em todos os {len(self.urls)} servidores API "
+                    f"e no fallback local. API: {last_error}, Local: {local_error}"
+                )
+
+        # Sem fallback local habilitado
         if self._job_manager and local_job_id:
             self._job_manager.mark_job_failed(
                 local_job_id,
@@ -1833,11 +1910,20 @@ def get_transcriber(config: dict) -> "WhisperTranscriber | WhisperAPIClient":
     provider = config.get('provider', 'local')
     
     if provider == 'whisperapi':
+        # Configuração para fallback local
+        local_config = {
+            'model': config.get('model', 'tiny'),
+            'use_cpp': config.get('use_cpp', True),
+            'threads': config.get('threads', 4),
+            'beam_size': config.get('beam_size', 1),
+        }
         return WhisperAPIClient(
             base_url=config.get('whisperapi_url', 'http://127.0.0.1:3001'),
             base_urls=config.get('whisperapi_urls', []),
             language=config.get('language', 'pt'),
             timeout=config.get('whisperapi_timeout', 300),
+            fallback_to_local=config.get('fallback_to_local', True),
+            local_config=local_config,
         )
     
     elif provider == 'openai':
