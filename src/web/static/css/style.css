@@ -2065,3 +2065,232 @@ input[type="checkbox"] {
     margin-top: 10px;
     white-space: pre-wrap;
 }
+
+/* ==========================================================================
+   System Info - Hardware Details
+   ========================================================================== */
+
+.system-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    gap: 12px;
+}
+
+.sys-item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px 12px;
+    background: var(--surface, rgba(0, 0, 0, 0.1));
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.sys-label {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.sys-value {
+    font-size: 0.95rem;
+    font-weight: 500;
+    color: var(--text);
+    word-break: break-word;
+}
+
+.sys-value.mono {
+    font-family: monospace;
+    font-size: 0.85rem;
+}
+
+/* Temperature colors */
+.temp-normal {
+    color: var(--success);
+}
+
+.temp-warm {
+    color: var(--warning);
+}
+
+.temp-hot {
+    color: var(--danger);
+}
+
+/* Memory / Disk / Swap bars */
+.memory-bar-container {
+    height: 12px;
+    background: var(--surface, rgba(0, 0, 0, 0.1));
+    border-radius: 6px;
+    overflow: hidden;
+    margin-bottom: 12px;
+    border: 1px solid var(--border);
+}
+
+.memory-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--primary-dark));
+    border-radius: 6px;
+    transition: width 0.3s ease;
+}
+
+.memory-bar.swap-bar {
+    background: linear-gradient(90deg, var(--warning), #d97706);
+}
+
+.memory-bar.disk-bar {
+    background: linear-gradient(90deg, var(--success), #059669);
+}
+
+/* Throttling */
+.throttle-status {
+    padding: 12px;
+    background: var(--surface, rgba(0, 0, 0, 0.05));
+    border-radius: 8px;
+}
+
+.throttle-status h4 {
+    font-size: 0.85rem;
+    margin-bottom: 10px;
+    color: var(--text-muted);
+}
+
+.throttle-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.throttle-item {
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    font-weight: 500;
+    background: rgba(34, 197, 94, 0.15);
+    color: var(--success);
+    border: 1px solid var(--success);
+}
+
+.throttle-item.warning {
+    background: rgba(245, 158, 11, 0.15);
+    color: var(--warning);
+    border-color: var(--warning);
+}
+
+.throttle-item.danger {
+    background: rgba(239, 68, 68, 0.15);
+    color: var(--danger);
+    border-color: var(--danger);
+}
+
+/* Power display */
+.power-display {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.power-meter {
+    height: 24px;
+    background: linear-gradient(90deg,
+        var(--success) 0%,
+        var(--success) 30%,
+        var(--warning) 50%,
+        var(--danger) 100%
+    );
+    border-radius: 12px;
+    overflow: hidden;
+    position: relative;
+    border: 1px solid var(--border);
+}
+
+.power-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.3);
+    border-right: 3px solid white;
+    transition: width 0.3s ease;
+}
+
+.power-info {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.power-value {
+    font-size: 1.5rem;
+    font-weight: 700;
+    color: var(--primary);
+}
+
+.power-range {
+    font-size: 0.75rem;
+    color: var(--text-muted);
+}
+
+/* Network interfaces */
+.network-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+    gap: 12px;
+}
+
+.network-item {
+    padding: 12px;
+    background: var(--surface, rgba(0, 0, 0, 0.05));
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.network-item .iface-name {
+    font-weight: 600;
+    font-size: 0.95rem;
+    margin-bottom: 8px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.network-item .iface-details {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.network-item .iface-details span {
+    display: flex;
+    justify-content: space-between;
+}
+
+.network-item .state-up {
+    color: var(--success);
+}
+
+.network-item .state-down {
+    color: var(--danger);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+    .sys-item {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .memory-bar-container {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .throttle-status {
+        background: rgba(255, 255, 255, 0.05);
+    }
+
+    .network-item {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}

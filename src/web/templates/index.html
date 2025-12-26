@@ -922,17 +922,237 @@
     <section id="tab-system" class="tab-content">
         <h2>Sistema</h2>
 
+        <!-- Básico -->
         <div class="status-card">
-            <h3>Informações do Sistema</h3>
-            <div id="system-info">
-                <p>Plataforma: <span id="sys-platform">-</span></p>
-                <p>Hostname: <span id="sys-hostname">-</span></p>
-                <p>CPU Temp: <span id="sys-temp">-</span></p>
-                <p>Memória: <span id="sys-memory">-</span></p>
-                <p>Disco: <span id="sys-disk">-</span></p>
+            <h3>📊 Informações Básicas</h3>
+            <div id="system-info" class="system-grid">
+                <div class="sys-item">
+                    <span class="sys-label">Hostname</span>
+                    <span class="sys-value" id="sys-hostname">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Plataforma</span>
+                    <span class="sys-value" id="sys-platform">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Hardware</span>
+                    <span class="sys-value" id="sys-hardware">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Serial</span>
+                    <span class="sys-value mono" id="sys-serial">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Uptime</span>
+                    <span class="sys-value" id="sys-uptime">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Load Average</span>
+                    <span class="sys-value" id="sys-load">-</span>
+                </div>
             </div>
-            <button type="button" id="btn-refresh-system" class="btn btn-secondary">🔄 Atualizar</button>
         </div>
+
+        <!-- CPU -->
+        <div class="status-card">
+            <h3>🔥 CPU & Temperatura</h3>
+            <div class="system-grid">
+                <div class="sys-item">
+                    <span class="sys-label">CPU Temp</span>
+                    <span class="sys-value" id="sys-cpu-temp">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">GPU Temp</span>
+                    <span class="sys-value" id="sys-gpu-temp">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Frequência Atual</span>
+                    <span class="sys-value" id="sys-freq-current">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Frequência (min/max)</span>
+                    <span class="sys-value" id="sys-freq-range">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Governor</span>
+                    <span class="sys-value" id="sys-governor">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">CPU Model</span>
+                    <span class="sys-value" id="sys-cpu-model">-</span>
+                </div>
+            </div>
+
+            <!-- Throttling -->
+            <div class="throttle-status" id="throttle-container" style="margin-top: 12px;">
+                <h4>⚡ Status de Throttling</h4>
+                <div id="throttle-flags" class="throttle-grid">
+                    <span class="throttle-item" id="throttle-voltage">🔌 Voltagem: OK</span>
+                    <span class="throttle-item" id="throttle-freq">📉 Freq Cap: OK</span>
+                    <span class="throttle-item" id="throttle-thermal">🌡️ Temp Limit: OK</span>
+                    <span class="throttle-item" id="throttle-active">⏸️ Throttled: NÃO</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Voltagens e Clocks -->
+        <div class="status-card">
+            <h3>⚡ Voltagens & Clocks</h3>
+            <div class="system-grid">
+                <div class="sys-item">
+                    <span class="sys-label">Core Voltage</span>
+                    <span class="sys-value" id="sys-volt-core">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">SDRAM_C Voltage</span>
+                    <span class="sys-value" id="sys-volt-sdram-c">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">SDRAM_I Voltage</span>
+                    <span class="sys-value" id="sys-volt-sdram-i">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">SDRAM_P Voltage</span>
+                    <span class="sys-value" id="sys-volt-sdram-p">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">ARM Clock</span>
+                    <span class="sys-value" id="sys-clock-arm">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Core Clock</span>
+                    <span class="sys-value" id="sys-clock-core">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">H264 Clock</span>
+                    <span class="sys-value" id="sys-clock-h264">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">eMMC Clock</span>
+                    <span class="sys-value" id="sys-clock-emmc">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Energia -->
+        <div class="status-card">
+            <h3>🔋 Energia Estimada</h3>
+            <div class="power-display">
+                <div class="power-meter">
+                    <div class="power-bar" id="power-bar" style="width: 30%;"></div>
+                </div>
+                <div class="power-info">
+                    <span class="power-value" id="sys-power">-</span>
+                    <span class="power-range">500mW (idle) - 1800mW (full load)</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Memória -->
+        <div class="status-card">
+            <h3>💾 Memória RAM</h3>
+            <div class="memory-bar-container">
+                <div class="memory-bar" id="memory-bar" style="width: 0%;"></div>
+            </div>
+            <div class="system-grid">
+                <div class="sys-item">
+                    <span class="sys-label">Total</span>
+                    <span class="sys-value" id="sys-mem-total">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Usado</span>
+                    <span class="sys-value" id="sys-mem-used">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Disponível</span>
+                    <span class="sys-value" id="sys-mem-available">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">% Uso</span>
+                    <span class="sys-value" id="sys-mem-percent">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Buffers</span>
+                    <span class="sys-value" id="sys-mem-buffers">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Cached</span>
+                    <span class="sys-value" id="sys-mem-cached">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">GPU Mem</span>
+                    <span class="sys-value" id="sys-gpu-mem">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">ARM Mem</span>
+                    <span class="sys-value" id="sys-arm-mem">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Swap -->
+        <div class="status-card">
+            <h3>💿 Swap</h3>
+            <div class="memory-bar-container">
+                <div class="memory-bar swap-bar" id="swap-bar" style="width: 0%;"></div>
+            </div>
+            <div class="system-grid">
+                <div class="sys-item">
+                    <span class="sys-label">Total</span>
+                    <span class="sys-value" id="sys-swap-total">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Usado</span>
+                    <span class="sys-value" id="sys-swap-used">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Livre</span>
+                    <span class="sys-value" id="sys-swap-free">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">% Uso</span>
+                    <span class="sys-value" id="sys-swap-percent">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Disco -->
+        <div class="status-card">
+            <h3>📁 Disco</h3>
+            <div class="memory-bar-container">
+                <div class="memory-bar disk-bar" id="disk-bar" style="width: 0%;"></div>
+            </div>
+            <div class="system-grid">
+                <div class="sys-item">
+                    <span class="sys-label">Total</span>
+                    <span class="sys-value" id="sys-disk-total">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Usado</span>
+                    <span class="sys-value" id="sys-disk-used">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">Livre</span>
+                    <span class="sys-value" id="sys-disk-free">-</span>
+                </div>
+                <div class="sys-item">
+                    <span class="sys-label">% Uso</span>
+                    <span class="sys-value" id="sys-disk-percent">-</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Rede -->
+        <div class="status-card">
+            <h3>🌐 Interfaces de Rede</h3>
+            <div id="network-interfaces" class="network-grid">
+                <p class="empty-message">Carregando...</p>
+            </div>
+        </div>
+
+        <button type="button" id="btn-refresh-system" class="btn btn-primary" style="margin-top: 16px;">🔄 Atualizar Sistema</button>
+
+        <hr style="margin: 24px 0; border-color: #333;">
 
         <div class="form-group">
             <label for="log_level">Nível de Log</label>

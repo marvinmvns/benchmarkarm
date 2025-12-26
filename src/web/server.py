@@ -338,50 +338,335 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         return config_manager.save_config(config, app.config["CONFIG_PATH"])
 
     def get_system_info() -> dict:
-        """Retorna informações do sistema."""
+        """Retorna informações detalhadas do sistema Raspberry Pi."""
+        import subprocess
+        import platform
+        import socket
+        import shutil
+
+        def run_cmd(cmd: str) -> str:
+            """Executa comando e retorna output."""
+            try:
+                result = subprocess.run(
+                    cmd, shell=True, capture_output=True, text=True, timeout=5
+                )
+                return result.stdout.strip()
+            except:
+                return ""
+
+        def vcgencmd(param: str) -> str:
+            """Executa vcgencmd com parâmetro."""
+            return run_cmd(f"vcgencmd {param}")
+
         info = {
+            # Básico
             "platform": "unknown",
             "hostname": "unknown",
+            "uptime": None,
+            "uptime_formatted": None,
+
+            # CPU
             "cpu_temp": None,
+            "cpu_freq_current": None,
+            "cpu_freq_min": None,
+            "cpu_freq_max": None,
+            "cpu_governor": None,
+            "cpu_model": None,
+            "cpu_cores": 4,
+            "load_1m": None,
+            "load_5m": None,
+            "load_15m": None,
+
+            # Voltagens (vcgencmd)
+            "voltage_core": None,
+            "voltage_sdram_c": None,
+            "voltage_sdram_i": None,
+            "voltage_sdram_p": None,
+
+            # Clocks (vcgencmd)
+            "clock_arm": None,
+            "clock_core": None,
+            "clock_h264": None,
+            "clock_emmc": None,
+
+            # Throttling
+            "throttled": None,
+            "throttled_flags": {},
+
+            # GPU
+            "gpu_temp": None,
+            "gpu_mem": None,
+            "arm_mem": None,
+
+            # Memória RAM
             "memory_total": 0,
             "memory_available": 0,
+            "memory_used": 0,
+            "memory_percent": 0,
+            "memory_buffers": 0,
+            "memory_cached": 0,
+
+            # Swap
+            "swap_total": 0,
+            "swap_used": 0,
+            "swap_free": 0,
+            "swap_percent": 0,
+
+            # Disco
             "disk_total": 0,
             "disk_free": 0,
+            "disk_used": 0,
+            "disk_percent": 0,
+
+            # Hardware ID
+            "serial": None,
+            "revision": None,
+            "hardware": None,
+
+            # Rede
+            "network": {},
+
+            # Energia estimada
+            "power_estimate_mw": None,
         }
 
+        # Básico
         try:
-            import platform
-            import socket
             info["platform"] = platform.platform()
             info["hostname"] = socket.gethostname()
         except:
             pass
 
-        # Temperatura (Raspberry Pi)
+        # Uptime
+        try:
+            with open("/proc/uptime", "r") as f:
+                uptime_sec = float(f.read().split()[0])
+                info["uptime"] = uptime_sec
+                days = int(uptime_sec // 86400)
+                hours = int((uptime_sec % 86400) // 3600)
+                mins = int((uptime_sec % 3600) // 60)
+                if days > 0:
+                    info["uptime_formatted"] = f"{days}d {hours}h {mins}m"
+                else:
+                    info["uptime_formatted"] = f"{hours}h {mins}m"
+        except:
+            pass
+
+        # Load Average
+        try:
+            with open("/proc/loadavg", "r") as f:
+                parts = f.read().split()
+                info["load_1m"] = float(parts[0])
+                info["load_5m"] = float(parts[1])
+                info["load_15m"] = float(parts[2])
+        except:
+            pass
+
+        # CPU Temperatura
         try:
             with open("/sys/class/thermal/thermal_zone0/temp", "r") as f:
                 info["cpu_temp"] = int(f.read()) / 1000
         except:
             pass
 
-        # Memória
+        # CPU Frequência
+        try:
+            with open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_cur_freq", "r") as f:
+                info["cpu_freq_current"] = int(f.read()) // 1000  # MHz
+        except:
+            pass
+        try:
+            with open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_min_freq", "r") as f:
+                info["cpu_freq_min"] = int(f.read()) // 1000
+        except:
+            pass
+        try:
+            with open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_max_freq", "r") as f:
+                info["cpu_freq_max"] = int(f.read()) // 1000
+        except:
+            pass
+        try:
+            with open("/sys/devices/system/cpu/cpu0/cpufreq/scaling_governor", "r") as f:
+                info["cpu_governor"] = f.read().strip()
+        except:
+            pass
+
+        # CPU Info
+        try:
+            with open("/proc/cpuinfo", "r") as f:
+                cpuinfo = f.read()
+                for line in cpuinfo.split("\n"):
+                    if line.startswith("model name"):
+                        info["cpu_model"] = line.split(":")[1].strip()
+                    elif line.startswith("Serial"):
+                        info["serial"] = line.split(":")[1].strip()
+                    elif line.startswith("Revision"):
+                        info["revision"] = line.split(":")[1].strip()
+                    elif line.startswith("Hardware"):
+                        info["hardware"] = line.split(":")[1].strip()
+        except:
+            pass
+
+        # vcgencmd - Voltagens
+        for name, param in [
+            ("voltage_core", "core"),
+            ("voltage_sdram_c", "sdram_c"),
+            ("voltage_sdram_i", "sdram_i"),
+            ("voltage_sdram_p", "sdram_p"),
+        ]:
+            output = vcgencmd(f"measure_volts {param}")
+            if "=" in output:
+                try:
+                    val = output.split("=")[1].replace("V", "")
+                    info[name] = float(val)
+                except:
+                    pass
+
+        # vcgencmd - Clocks
+        for name, param in [
+            ("clock_arm", "arm"),
+            ("clock_core", "core"),
+            ("clock_h264", "h264"),
+            ("clock_emmc", "emmc"),
+        ]:
+            output = vcgencmd(f"measure_clock {param}")
+            if "=" in output:
+                try:
+                    val = int(output.split("=")[1])
+                    info[name] = val // 1000000  # Hz -> MHz
+                except:
+                    pass
+
+        # vcgencmd - Throttling
+        output = vcgencmd("get_throttled")
+        if "=" in output:
+            try:
+                throttled_hex = output.split("=")[1]
+                throttled_val = int(throttled_hex, 16)
+                info["throttled"] = throttled_hex
+
+                # Decodificar flags de throttling
+                info["throttled_flags"] = {
+                    "under_voltage_now": bool(throttled_val & 0x1),
+                    "freq_capped_now": bool(throttled_val & 0x2),
+                    "throttled_now": bool(throttled_val & 0x4),
+                    "soft_temp_limit_now": bool(throttled_val & 0x8),
+                    "under_voltage_occurred": bool(throttled_val & 0x10000),
+                    "freq_capped_occurred": bool(throttled_val & 0x20000),
+                    "throttled_occurred": bool(throttled_val & 0x40000),
+                    "soft_temp_limit_occurred": bool(throttled_val & 0x80000),
+                }
+            except:
+                pass
+
+        # vcgencmd - GPU temp
+        output = vcgencmd("measure_temp")
+        if "=" in output:
+            try:
+                val = output.split("=")[1].replace("'C", "")
+                info["gpu_temp"] = float(val)
+            except:
+                pass
+
+        # vcgencmd - Memory split
+        for name, param in [("gpu_mem", "gpu"), ("arm_mem", "arm")]:
+            output = vcgencmd(f"get_mem {param}")
+            if "=" in output:
+                try:
+                    val = output.split("=")[1].replace("M", "")
+                    info[name] = int(val)  # MB
+                except:
+                    pass
+
+        # Memória RAM detalhada
         try:
             with open("/proc/meminfo", "r") as f:
-                meminfo = f.read()
-                for line in meminfo.split("\n"):
-                    if line.startswith("MemTotal:"):
-                        info["memory_total"] = int(line.split()[1]) * 1024
-                    elif line.startswith("MemAvailable:"):
-                        info["memory_available"] = int(line.split()[1]) * 1024
+                meminfo = {}
+                for line in f:
+                    parts = line.split(":")
+                    if len(parts) == 2:
+                        key = parts[0].strip()
+                        val = parts[1].strip().split()[0]
+                        meminfo[key] = int(val) * 1024  # KB -> bytes
+
+                info["memory_total"] = meminfo.get("MemTotal", 0)
+                info["memory_available"] = meminfo.get("MemAvailable", 0)
+                info["memory_buffers"] = meminfo.get("Buffers", 0)
+                info["memory_cached"] = meminfo.get("Cached", 0)
+                info["memory_used"] = info["memory_total"] - info["memory_available"]
+                if info["memory_total"] > 0:
+                    info["memory_percent"] = round(
+                        (info["memory_used"] / info["memory_total"]) * 100, 1
+                    )
+
+                # Swap
+                info["swap_total"] = meminfo.get("SwapTotal", 0)
+                info["swap_free"] = meminfo.get("SwapFree", 0)
+                info["swap_used"] = info["swap_total"] - info["swap_free"]
+                if info["swap_total"] > 0:
+                    info["swap_percent"] = round(
+                        (info["swap_used"] / info["swap_total"]) * 100, 1
+                    )
         except:
             pass
 
         # Disco
         try:
-            import shutil
             usage = shutil.disk_usage("/")
             info["disk_total"] = usage.total
             info["disk_free"] = usage.free
+            info["disk_used"] = usage.used
+            info["disk_percent"] = round((usage.used / usage.total) * 100, 1)
+        except:
+            pass
+
+        # Network interfaces
+        try:
+            for iface in os.listdir("/sys/class/net/"):
+                if iface == "lo":
+                    continue
+                iface_info = {"state": "down", "ip": None, "mac": None}
+
+                # Estado
+                try:
+                    with open(f"/sys/class/net/{iface}/operstate", "r") as f:
+                        iface_info["state"] = f.read().strip()
+                except:
+                    pass
+
+                # MAC
+                try:
+                    with open(f"/sys/class/net/{iface}/address", "r") as f:
+                        iface_info["mac"] = f.read().strip()
+                except:
+                    pass
+
+                # IP (via ip addr)
+                ip_out = run_cmd(f"ip -4 addr show {iface} | grep inet")
+                if ip_out:
+                    try:
+                        iface_info["ip"] = ip_out.split()[1].split("/")[0]
+                    except:
+                        pass
+
+                info["network"][iface] = iface_info
+        except:
+            pass
+
+        # Estimativa de consumo de energia (mW)
+        # Pi Zero 2W: ~100-350mA @ 5V dependendo da carga
+        # Fórmula simplificada baseada em freq e temp
+        try:
+            if info["cpu_freq_current"] and info["cpu_temp"]:
+                freq_factor = info["cpu_freq_current"] / 1000  # 0-1.0 GHz
+                temp_factor = min(info["cpu_temp"] / 80, 1.0)  # 0-1.0
+                load_factor = info["load_1m"] / 4 if info["load_1m"] else 0.2
+
+                # Base: 500mW idle, até 1800mW em carga total
+                base_power = 500
+                max_extra = 1300
+                estimated = base_power + (max_extra * freq_factor * max(load_factor, temp_factor * 0.5))
+                info["power_estimate_mw"] = int(estimated)
         except:
             pass
 

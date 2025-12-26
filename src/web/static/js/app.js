@@ -455,16 +455,154 @@ async function refreshSystemInfo() {
     try {
         const info = await apiGet('system');
 
+        // Helper para colorir temperatura
+        const tempClass = (t) => {
+            if (t < 50) return 'temp-normal';
+            if (t < 70) return 'temp-warm';
+            return 'temp-hot';
+        };
+
+        // Básico
         $('#sys-platform').textContent = info.platform || '-';
         $('#sys-hostname').textContent = info.hostname || '-';
-        $('#sys-temp').textContent = info.cpu_temp ? `${info.cpu_temp.toFixed(1)}°C` : '-';
-        $('#sys-memory').textContent = info.memory_total ?
-            `${formatBytes(info.memory_available)} / ${formatBytes(info.memory_total)}` : '-';
-        $('#sys-disk').textContent = info.disk_total ?
-            `${formatBytes(info.disk_free)} livre` : '-';
+        $('#sys-hardware').textContent = info.hardware || '-';
+        $('#sys-serial').textContent = info.serial || '-';
+        $('#sys-uptime').textContent = info.uptime_formatted || '-';
+        $('#sys-load').textContent = info.load_1m ?
+            `${info.load_1m.toFixed(2)} / ${info.load_5m.toFixed(2)} / ${info.load_15m.toFixed(2)}` : '-';
+
+        // CPU & Temperatura
+        const cpuTempEl = $('#sys-cpu-temp');
+        if (cpuTempEl && info.cpu_temp) {
+            cpuTempEl.textContent = `${info.cpu_temp.toFixed(1)}°C`;
+            cpuTempEl.className = `sys-value ${tempClass(info.cpu_temp)}`;
+        } else if (cpuTempEl) {
+            cpuTempEl.textContent = '-';
+        }
+
+        const gpuTempEl = $('#sys-gpu-temp');
+        if (gpuTempEl && info.gpu_temp) {
+            gpuTempEl.textContent = `${info.gpu_temp.toFixed(1)}°C`;
+            gpuTempEl.className = `sys-value ${tempClass(info.gpu_temp)}`;
+        } else if (gpuTempEl) {
+            gpuTempEl.textContent = '-';
+        }
+
+        $('#sys-freq-current').textContent = info.cpu_freq_current ? `${info.cpu_freq_current} MHz` : '-';
+        $('#sys-freq-range').textContent = (info.cpu_freq_min && info.cpu_freq_max) ?
+            `${info.cpu_freq_min} - ${info.cpu_freq_max} MHz` : '-';
+        $('#sys-governor').textContent = info.cpu_governor || '-';
+        $('#sys-cpu-model').textContent = info.cpu_model || 'ARM Cortex-A53';
+
+        // Throttling
+        const tf = info.throttled_flags || {};
+        updateThrottleFlag('throttle-voltage', '🔌 Voltagem', tf.under_voltage_now, tf.under_voltage_occurred);
+        updateThrottleFlag('throttle-freq', '📉 Freq Cap', tf.freq_capped_now, tf.freq_capped_occurred);
+        updateThrottleFlag('throttle-thermal', '🌡️ Temp Limit', tf.soft_temp_limit_now, tf.soft_temp_limit_occurred);
+        updateThrottleFlag('throttle-active', '⏸️ Throttled', tf.throttled_now, tf.throttled_occurred);
+
+        // Voltagens
+        $('#sys-volt-core').textContent = info.voltage_core ? `${info.voltage_core.toFixed(4)}V` : '-';
+        $('#sys-volt-sdram-c').textContent = info.voltage_sdram_c ? `${info.voltage_sdram_c.toFixed(4)}V` : '-';
+        $('#sys-volt-sdram-i').textContent = info.voltage_sdram_i ? `${info.voltage_sdram_i.toFixed(4)}V` : '-';
+        $('#sys-volt-sdram-p').textContent = info.voltage_sdram_p ? `${info.voltage_sdram_p.toFixed(4)}V` : '-';
+
+        // Clocks
+        $('#sys-clock-arm').textContent = info.clock_arm ? `${info.clock_arm} MHz` : '-';
+        $('#sys-clock-core').textContent = info.clock_core ? `${info.clock_core} MHz` : '-';
+        $('#sys-clock-h264').textContent = info.clock_h264 ? `${info.clock_h264} MHz` : '-';
+        $('#sys-clock-emmc').textContent = info.clock_emmc ? `${info.clock_emmc} MHz` : '-';
+
+        // Energia
+        const powerEl = $('#sys-power');
+        const powerBarEl = $('#power-bar');
+        if (info.power_estimate_mw) {
+            if (powerEl) powerEl.textContent = `${info.power_estimate_mw} mW`;
+            // 500-1800 mW range -> 0-100%
+            const powerPercent = Math.min(100, Math.max(0, ((info.power_estimate_mw - 500) / 1300) * 100));
+            if (powerBarEl) powerBarEl.style.width = `${powerPercent}%`;
+        } else {
+            if (powerEl) powerEl.textContent = '-';
+        }
+
+        // Memória RAM
+        $('#sys-mem-total').textContent = formatBytes(info.memory_total);
+        $('#sys-mem-used').textContent = formatBytes(info.memory_used);
+        $('#sys-mem-available').textContent = formatBytes(info.memory_available);
+        $('#sys-mem-percent').textContent = info.memory_percent ? `${info.memory_percent}%` : '-';
+        $('#sys-mem-buffers').textContent = formatBytes(info.memory_buffers);
+        $('#sys-mem-cached').textContent = formatBytes(info.memory_cached);
+        $('#sys-gpu-mem').textContent = info.gpu_mem ? `${info.gpu_mem} MB` : '-';
+        $('#sys-arm-mem').textContent = info.arm_mem ? `${info.arm_mem} MB` : '-';
+        const memBar = $('#memory-bar');
+        if (memBar) memBar.style.width = `${info.memory_percent || 0}%`;
+
+        // Swap
+        $('#sys-swap-total').textContent = formatBytes(info.swap_total);
+        $('#sys-swap-used').textContent = formatBytes(info.swap_used);
+        $('#sys-swap-free').textContent = formatBytes(info.swap_free);
+        $('#sys-swap-percent').textContent = info.swap_percent ? `${info.swap_percent}%` : '-';
+        const swapBar = $('#swap-bar');
+        if (swapBar) swapBar.style.width = `${info.swap_percent || 0}%`;
+
+        // Disco
+        $('#sys-disk-total').textContent = formatBytes(info.disk_total);
+        $('#sys-disk-used').textContent = formatBytes(info.disk_used);
+        $('#sys-disk-free').textContent = formatBytes(info.disk_free);
+        $('#sys-disk-percent').textContent = info.disk_percent ? `${info.disk_percent}%` : '-';
+        const diskBar = $('#disk-bar');
+        if (diskBar) diskBar.style.width = `${info.disk_percent || 0}%`;
+
+        // Rede
+        renderNetworkInterfaces(info.network || {});
+
     } catch (error) {
         console.error('Erro ao obter info do sistema:', error);
     }
+}
+
+function updateThrottleFlag(elementId, label, isActive, hasOccurred) {
+    const el = document.getElementById(elementId);
+    if (!el) return;
+
+    if (isActive) {
+        el.textContent = `${label}: ATIVO!`;
+        el.className = 'throttle-item danger';
+    } else if (hasOccurred) {
+        el.textContent = `${label}: Histórico`;
+        el.className = 'throttle-item warning';
+    } else {
+        el.textContent = `${label}: OK`;
+        el.className = 'throttle-item';
+    }
+}
+
+function renderNetworkInterfaces(network) {
+    const container = document.getElementById('network-interfaces');
+    if (!container) return;
+
+    const ifaces = Object.entries(network);
+    if (ifaces.length === 0) {
+        container.innerHTML = '<p class="empty-message">Nenhuma interface encontrada</p>';
+        return;
+    }
+
+    container.innerHTML = ifaces.map(([name, info]) => {
+        const stateClass = info.state === 'up' ? 'state-up' : 'state-down';
+        const stateIcon = info.state === 'up' ? '🟢' : '🔴';
+        return `
+            <div class="network-item">
+                <div class="iface-name">
+                    ${stateIcon} ${name}
+                    <span class="${stateClass}">(${info.state})</span>
+                </div>
+                <div class="iface-details">
+                    <span>IP: <strong>${info.ip || 'N/A'}</strong></span>
+                    <span>MAC: <code>${info.mac || 'N/A'}</code></span>
+                </div>
+            </div>
+        `;
+    }).join('');
 }
 
 async function refreshQueueStats() {
