@@ -295,22 +295,88 @@ class BatchProcessor:
             logger.error(f"Erro ao deletar {filename}: {e}")
             return False
     
+    def _validate_audio_has_speech(self, wav_path: Path) -> tuple:
+        """
+        Valida se o arquivo de áudio contém fala antes de enviar para transcrição.
+
+        Args:
+            wav_path: Caminho do arquivo .wav
+
+        Returns:
+            Tuple (has_speech: bool, confidence: float, duration: float)
+        """
+        try:
+            import wave
+            import numpy as np
+            from ..audio.vad import VoiceActivityDetector
+
+            # Ler arquivo WAV
+            with wave.open(str(wav_path), 'rb') as wav:
+                sample_rate = wav.getframerate()
+                n_frames = wav.getnframes()
+                duration = n_frames / sample_rate
+                audio_bytes = wav.readframes(n_frames)
+
+            # Converter para numpy array
+            audio = np.frombuffer(audio_bytes, dtype=np.int16)
+
+            # Usar VAD para verificar se há fala
+            vad = VoiceActivityDetector(
+                sample_rate=sample_rate,
+                aggressiveness=2,  # Moderado
+                min_speech_duration=0.3,
+            )
+
+            result = vad.is_speech(audio, return_details=True)
+
+            logger.debug(
+                f"VAD {wav_path.name}: speech={result.is_speech}, "
+                f"confidence={result.confidence:.2f}, energy={result.energy:.0f}"
+            )
+
+            return result.is_speech, result.confidence, duration
+
+        except Exception as e:
+            logger.warning(f"Erro na validação VAD de {wav_path.name}: {e}")
+            # Em caso de erro, assumir que tem fala para não descartar
+            return True, 0.5, 0.0
+
     def process_file(self, wav_path: Path) -> bool:
         """
         Processa um arquivo .wav individual.
-        
+
+        Inclui validação VAD para evitar processar arquivos sem fala.
+
         Args:
             wav_path: Caminho do arquivo .wav
-            
+
         Returns:
             True se processado com sucesso
         """
         logger.info(f"📝 Processando: {wav_path.name}")
         self._stats.current_file = wav_path.name
-        
+
+        # 1. Validar se há fala no áudio antes de enviar para transcrição
+        has_speech, confidence, duration = self._validate_audio_has_speech(wav_path)
+
+        if not has_speech:
+            logger.info(
+                f"⏭️ Pulando {wav_path.name}: sem fala detectada "
+                f"(confidence={confidence:.2f}, duration={duration:.1f}s)"
+            )
+            # Remover arquivo sem fala para economizar espaço
+            try:
+                wav_path.unlink()
+                logger.debug(f"🗑️ Arquivo sem fala removido: {wav_path.name}")
+            except Exception:
+                pass
+            return True  # Considera "processado" pois não tinha conteúdo útil
+
+        logger.debug(f"✅ VAD OK: {wav_path.name} (confidence={confidence:.2f})")
+
         retries = 3
         delay = 1.0
-        
+
         try:
             for attempt in range(retries):
                 try:
