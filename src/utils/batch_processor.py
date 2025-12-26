@@ -12,8 +12,10 @@ Integração com JobManager:
 
 import logging
 import os
+import re
 import threading
 import time
+import uuid
 from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
@@ -21,6 +23,8 @@ from typing import List, Optional, Callable, TYPE_CHECKING
 
 if TYPE_CHECKING:
     from ..transcription.job_manager import JobManager
+
+from .transcription_store import get_transcription_store, TranscriptionRecord
 
 logger = logging.getLogger(__name__)
 
@@ -398,30 +402,35 @@ class BatchProcessor:
                             pass
                         return True  # Considera "processado"
 
-                    # Criar conteúdo do .txt com metadados
-                    txt_content = self._format_transcription(
-                        wav_name=wav_path.name,
-                        text=text,
-                        duration=result.duration,
-                        model=result.model,
-                        language=result.language,
-                        processing_time=result.processing_time,
-                    )
+                    # Extrair timestamp do nome do arquivo (audio_YYYYMMDD_HHMMSS.wav)
+                    audio_timestamp = self._extract_timestamp_from_filename(wav_path.name)
 
-                    # Salvar .txt
-                    txt_path = wav_path.with_suffix(".txt")
-                    txt_path.write_text(txt_content, encoding="utf-8")
-                    logger.info(f"✅ Salvo: {txt_path.name}")
+                    # Salvar no TranscriptionStore (cria TXT diário automaticamente)
+                    try:
+                        store = get_transcription_store()
+                        record = TranscriptionRecord(
+                            id=str(uuid.uuid4()),
+                            timestamp=audio_timestamp,
+                            duration_seconds=result.duration or 0.0,
+                            text=text,
+                            audio_file=str(wav_path),
+                            language=result.language or "pt",
+                            processed_by=f"batch-{result.model}" if result.model else "batch",
+                        )
+                        store.save(record)
+                        logger.info(f"✅ Salvo no banco: {record.id[:8]}...")
+                    except Exception as e:
+                        logger.warning(f"Erro ao salvar no TranscriptionStore: {e}")
 
                     # Remover .wav
                     wav_path.unlink()
                     logger.info(f"🗑️ Removido: {wav_path.name}")
-                    
+
                     self._stats.processed_files += 1
-                    
+
                     if self._on_file_processed:
-                        self._on_file_processed(wav_path.name, txt_path.name)
-                    
+                        self._on_file_processed(wav_path.name, record.id if record else "")
+
                     return True
                     
                 except Exception as e:
@@ -440,7 +449,34 @@ class BatchProcessor:
             
         finally:
             self._stats.current_file = None
-    
+
+    def _extract_timestamp_from_filename(self, filename: str) -> datetime:
+        """
+        Extrai timestamp do nome do arquivo de áudio.
+
+        Formatos suportados:
+        - audio_YYYYMMDD_HHMMSS.wav
+        - audio_YYYYMMDD_HHMMSS_suffix.wav
+
+        Args:
+            filename: Nome do arquivo
+
+        Returns:
+            datetime extraído ou datetime.now() se não conseguir parsear
+        """
+        # Padrão: audio_20251225_143052.wav
+        match = re.search(r'(\d{8})_(\d{6})', filename)
+        if match:
+            try:
+                date_str = match.group(1)  # YYYYMMDD
+                time_str = match.group(2)  # HHMMSS
+                return datetime.strptime(f"{date_str}{time_str}", "%Y%m%d%H%M%S")
+            except ValueError:
+                pass
+
+        # Fallback: usar data atual
+        return datetime.now()
+
     def _format_transcription(
         self,
         wav_name: str,
