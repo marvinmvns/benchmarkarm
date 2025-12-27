@@ -27,6 +27,36 @@ class AudioBuffer:
     channels: int
     duration: float
     timestamp: float
+    has_speech: bool = True  # Resultado da validação VAD (padrão True para compatibilidade)
+    vad_confidence: float = 1.0  # Confiança da detecção VAD
+    vad_energy: float = 0.0  # Energia do áudio
+
+    def validate_speech(self, aggressiveness: int = 2, min_confidence: float = 0.1) -> bool:
+        """
+        Valida se o buffer contém fala usando VAD.
+
+        Args:
+            aggressiveness: Nível de agressividade do VAD (0-3)
+            min_confidence: Confiança mínima para considerar válido
+
+        Returns:
+            True se contém fala
+        """
+        from .vad import validate_audio_has_speech
+
+        has_speech, confidence, duration, energy = validate_audio_has_speech(
+            self.data,
+            sample_rate=self.sample_rate,
+            aggressiveness=aggressiveness,
+            min_confidence=min_confidence,
+        )
+
+        # Atualizar atributos
+        self.has_speech = has_speech
+        self.vad_confidence = confidence
+        self.vad_energy = energy
+
+        return has_speech
 
     def to_wav_bytes(self) -> bytes:
         """Converte para bytes WAV."""
@@ -253,6 +283,7 @@ class AudioCapture:
         stop_on_silence: bool = True,
         silence_duration: float = 2.0,
         vad: Optional["VoiceActivityDetector"] = None,
+        validate_speech: bool = True,
     ) -> AudioBuffer:
         """
         Grava áudio por duração especificada ou até silêncio.
@@ -262,9 +293,10 @@ class AudioCapture:
             stop_on_silence: Parar quando detectar silêncio
             silence_duration: Duração do silêncio para parar (segundos)
             vad: Detector de atividade de voz (opcional)
+            validate_speech: Se True, valida se o áudio contém fala após gravação
 
         Returns:
-            Buffer de áudio gravado
+            Buffer de áudio gravado (com has_speech=False se não houver fala)
         """
         duration = duration or self.max_duration
         frames = []
@@ -314,13 +346,24 @@ class AudioCapture:
         else:
             audio_array = np.array([], dtype=np.int16)
 
-        return AudioBuffer(
+        buffer = AudioBuffer(
             data=audio_array,
             sample_rate=self.sample_rate,
             channels=self.channels,
             duration=len(audio_array) / self.sample_rate,
             timestamp=start_time,
         )
+
+        # Validação VAD pós-gravação
+        if validate_speech and len(audio_array) > 0:
+            has_speech = buffer.validate_speech(aggressiveness=2, min_confidence=0.1)
+            if not has_speech:
+                logger.info(
+                    f"⏭️ VAD (ReSpeaker): Gravação sem fala detectada "
+                    f"(confidence={buffer.vad_confidence:.2f}, energy={buffer.vad_energy:.0f})"
+                )
+
+        return buffer
 
     def stream(
         self,

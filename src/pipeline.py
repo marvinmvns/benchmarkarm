@@ -9,7 +9,7 @@ from dataclasses import dataclass
 from typing import Optional, Callable, Literal
 
 from .audio.capture import AudioCapture, AudioBuffer
-from .audio.vad import VoiceActivityDetector
+from .audio.vad import VoiceActivityDetector, validate_audio_has_speech, validate_audio_file_has_speech
 from .transcription.whisper import WhisperTranscriber, TranscriptionResult, get_transcriber
 from .llm.base import LLMProvider, LLMResponse
 from .llm.local import LocalLLM
@@ -217,6 +217,7 @@ class VoiceProcessor:
         self,
         audio: AudioBuffer,
         language: Optional[str] = None,
+        skip_vad: bool = False,
     ) -> TranscriptionResult:
         """
         Transcreve áudio.
@@ -224,10 +225,30 @@ class VoiceProcessor:
         Args:
             audio: Buffer de áudio
             language: Idioma (usa configuração se None)
+            skip_vad: Se True, pula validação VAD (use quando já validado)
 
         Returns:
             Resultado da transcrição
         """
+        # Validação VAD antes de transcrever
+        if not skip_vad and self.config.audio.vad_enabled:
+            has_speech, confidence, duration, energy = validate_audio_has_speech(
+                audio.data, sample_rate=audio.sample_rate
+            )
+            if not has_speech:
+                logger.info(
+                    f"⏭️ VAD (Pipeline): Áudio sem fala detectada "
+                    f"(confidence={confidence:.2f}, energy={energy:.0f})"
+                )
+                return TranscriptionResult(
+                    text="",
+                    language=language or self.config.whisper.language,
+                    duration=audio.duration,
+                    processing_time=0.0,
+                    model=self.config.whisper.model,
+                    segments=[],
+                )
+
         # Verificar cache
         if self.cache:
             cache_key = f"transcribe:{hash(audio.data.tobytes())}"
@@ -402,6 +423,7 @@ class VoiceProcessor:
         file_path: str,
         generate_summary: bool = True,
         summary_style: str = "concise",
+        skip_vad: bool = False,
     ) -> ProcessingResult:
         """
         Processa arquivo de áudio.
@@ -410,10 +432,38 @@ class VoiceProcessor:
             file_path: Caminho do arquivo WAV
             generate_summary: Se deve gerar resumo
             summary_style: Estilo do resumo
+            skip_vad: Se True, pula validação VAD
 
         Returns:
             Resultado do processamento
         """
+        # Validação VAD antes de carregar o arquivo completo
+        if not skip_vad and self.config.audio.vad_enabled:
+            has_speech, confidence, duration, energy = validate_audio_file_has_speech(
+                file_path, aggressiveness=2, min_speech_duration=0.3
+            )
+            if not has_speech:
+                logger.info(
+                    f"⏭️ VAD (process_file): Arquivo sem fala detectada "
+                    f"(confidence={confidence:.2f}, energy={energy:.0f})"
+                )
+                # Retornar resultado vazio sem carregar o arquivo
+                empty_transcription = TranscriptionResult(
+                    text="",
+                    language=self.config.whisper.language,
+                    duration=duration,
+                    processing_time=0.0,
+                    model=self.config.whisper.model,
+                    segments=[],
+                )
+                return ProcessingResult(
+                    audio_duration=duration,
+                    transcription=empty_transcription,
+                    llm_response=None,
+                    total_time=0.0,
+                    cached=False,
+                )
+
         audio = AudioBuffer.from_file(file_path)
         return self.process(
             audio=audio,

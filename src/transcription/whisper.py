@@ -17,6 +17,7 @@ import json
 import numpy as np
 
 from ..audio.capture import AudioBuffer
+from ..audio.vad import validate_audio_has_speech, validate_audio_file_has_speech
 from ..utils.cpu_limiter import get_cpu_limiter
 
 logger = logging.getLogger(__name__)
@@ -210,6 +211,7 @@ class WhisperTranscriber:
         self,
         audio: AudioBuffer | np.ndarray | str,
         language: Optional[str] = None,
+        skip_vad: bool = False,
     ) -> TranscriptionResult:
         """
         Transcreve áudio para texto.
@@ -217,12 +219,67 @@ class WhisperTranscriber:
         Args:
             audio: Buffer de áudio, array numpy ou caminho de arquivo
             language: Idioma (usa padrão se None)
+            skip_vad: Se True, pula validação VAD (use quando já validado)
 
         Returns:
             Resultado da transcrição
         """
         language = language or self.language
         start_time = time.time()
+
+        # Validação VAD antes de transcrever (evita processar silêncio)
+        if not skip_vad:
+            if isinstance(audio, str):
+                has_speech, confidence, duration, energy = validate_audio_file_has_speech(
+                    audio, aggressiveness=2, min_speech_duration=0.3
+                )
+                if not has_speech:
+                    logger.info(
+                        f"⏭️ VAD: Áudio sem fala detectada "
+                        f"(confidence={confidence:.2f}, energy={energy:.0f})"
+                    )
+                    return TranscriptionResult(
+                        text="",
+                        language=language,
+                        duration=duration,
+                        processing_time=time.time() - start_time,
+                        model=self.model,
+                        segments=[],
+                    )
+            elif isinstance(audio, AudioBuffer):
+                has_speech, confidence, duration, energy = validate_audio_has_speech(
+                    audio.data, sample_rate=audio.sample_rate
+                )
+                if not has_speech:
+                    logger.info(
+                        f"⏭️ VAD: AudioBuffer sem fala detectada "
+                        f"(confidence={confidence:.2f}, energy={energy:.0f})"
+                    )
+                    return TranscriptionResult(
+                        text="",
+                        language=language,
+                        duration=audio.duration,
+                        processing_time=time.time() - start_time,
+                        model=self.model,
+                        segments=[],
+                    )
+            elif isinstance(audio, np.ndarray):
+                has_speech, confidence, duration, energy = validate_audio_has_speech(
+                    audio, sample_rate=16000
+                )
+                if not has_speech:
+                    logger.info(
+                        f"⏭️ VAD: Array numpy sem fala detectada "
+                        f"(confidence={confidence:.2f}, energy={energy:.0f})"
+                    )
+                    return TranscriptionResult(
+                        text="",
+                        language=language,
+                        duration=duration,
+                        processing_time=time.time() - start_time,
+                        model=self.model,
+                        segments=[],
+                    )
 
         # OTIMIZADO: Usar named pipe em vez de arquivo temporário (50-100ms mais rápido)
         # Se for arquivo existente, usar diretamente
@@ -1426,11 +1483,13 @@ class WhisperAPIClient:
         language: Optional[str] = None,
         translate: Optional[bool] = None,
         word_timestamps: Optional[bool] = None,
+        skip_vad: bool = False,
     ) -> TranscriptionResult:
         """
         Transcreve áudio usando WhisperAPI com failover inteligente.
 
         Características:
+        - Validação VAD antes de enviar para API (economia de banda/recursos)
         - Tenta automaticamente em outro servidor se um falhar
         - Marca servidores problemáticos temporariamente
         - Só falha completamente após tentar todos os servidores disponíveis
@@ -1441,6 +1500,7 @@ class WhisperAPIClient:
             language: Idioma ('pt', 'en', 'auto', etc.)
             translate: Se True, traduz para inglês
             word_timestamps: Se True, inclui timestamps por palavra
+            skip_vad: Se True, pula validação VAD (use quando já validado)
 
         Returns:
             TranscriptionResult com texto, idioma, duração, etc.
@@ -1448,6 +1508,63 @@ class WhisperAPIClient:
         start_time = time.time()
         language = language or self.language
         local_job_id = None
+
+        # Validação VAD antes de enviar para API (economia de banda/recursos)
+        if not skip_vad:
+            if isinstance(audio, str):
+                has_speech, confidence, duration, energy = validate_audio_file_has_speech(
+                    audio, aggressiveness=2, min_speech_duration=0.3
+                )
+                if not has_speech:
+                    logger.info(
+                        f"⏭️ VAD (API): Arquivo sem fala detectada "
+                        f"(confidence={confidence:.2f}, energy={energy:.0f})"
+                    )
+                    return TranscriptionResult(
+                        text="",
+                        language=language,
+                        duration=duration,
+                        processing_time=time.time() - start_time,
+                        model="whisperapi",
+                        segments=[],
+                        server_url=None,
+                    )
+            elif isinstance(audio, AudioBuffer):
+                has_speech, confidence, duration, energy = validate_audio_has_speech(
+                    audio.data, sample_rate=audio.sample_rate
+                )
+                if not has_speech:
+                    logger.info(
+                        f"⏭️ VAD (API): AudioBuffer sem fala detectada "
+                        f"(confidence={confidence:.2f}, energy={energy:.0f})"
+                    )
+                    return TranscriptionResult(
+                        text="",
+                        language=language,
+                        duration=audio.duration,
+                        processing_time=time.time() - start_time,
+                        model="whisperapi",
+                        segments=[],
+                        server_url=None,
+                    )
+            elif isinstance(audio, np.ndarray):
+                has_speech, confidence, duration, energy = validate_audio_has_speech(
+                    audio, sample_rate=16000
+                )
+                if not has_speech:
+                    logger.info(
+                        f"⏭️ VAD (API): Array sem fala detectada "
+                        f"(confidence={confidence:.2f}, energy={energy:.0f})"
+                    )
+                    return TranscriptionResult(
+                        text="",
+                        language=language,
+                        duration=duration,
+                        processing_time=time.time() - start_time,
+                        model="whisperapi",
+                        segments=[],
+                        server_url=None,
+                    )
 
         # Preparar arquivo de áudio
         if isinstance(audio, str):

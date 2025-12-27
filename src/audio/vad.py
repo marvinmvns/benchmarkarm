@@ -377,6 +377,113 @@ class VoiceActivityDetector:
         return audio[start:end]
 
 
+def validate_audio_has_speech(
+    audio: np.ndarray,
+    sample_rate: int = 16000,
+    aggressiveness: int = 2,
+    min_speech_duration: float = 0.3,
+    min_confidence: float = 0.1,
+) -> tuple:
+    """
+    Valida se o áudio contém fala antes de enviar para transcrição.
+
+    Função helper reutilizável para validação VAD em qualquer parte do sistema.
+
+    Args:
+        audio: Array numpy com áudio (int16 ou float)
+        sample_rate: Taxa de amostragem do áudio
+        aggressiveness: Nível de agressividade do VAD (0-3)
+        min_speech_duration: Duração mínima de fala em segundos
+        min_confidence: Confiança mínima para considerar fala válida
+
+    Returns:
+        Tuple (has_speech: bool, confidence: float, duration: float, energy: float)
+    """
+    try:
+        # Calcular duração
+        if audio.dtype == np.int16:
+            duration = len(audio) / sample_rate
+        else:
+            duration = len(audio) / sample_rate
+
+        # Criar VAD temporário
+        vad = VoiceActivityDetector(
+            sample_rate=sample_rate,
+            aggressiveness=aggressiveness,
+            min_speech_duration=min_speech_duration,
+        )
+
+        # Verificar se há fala
+        result = vad.is_speech(audio, return_details=True)
+
+        # Considerar válido se tem fala E confiança mínima
+        has_speech = result.is_speech and result.confidence >= min_confidence
+
+        logger.debug(
+            f"VAD validation: speech={has_speech}, "
+            f"confidence={result.confidence:.2f}, energy={result.energy:.0f}, "
+            f"duration={duration:.1f}s"
+        )
+
+        return has_speech, result.confidence, duration, result.energy
+
+    except Exception as e:
+        logger.warning(f"Erro na validação VAD: {e}")
+        # Em caso de erro, assumir que tem fala para não descartar
+        return True, 0.5, 0.0, 0.0
+
+
+def validate_audio_file_has_speech(
+    file_path: str,
+    aggressiveness: int = 2,
+    min_speech_duration: float = 0.3,
+    min_confidence: float = 0.1,
+) -> tuple:
+    """
+    Valida se um arquivo de áudio contém fala.
+
+    Args:
+        file_path: Caminho do arquivo WAV
+        aggressiveness: Nível de agressividade do VAD (0-3)
+        min_speech_duration: Duração mínima de fala em segundos
+        min_confidence: Confiança mínima para considerar fala válida
+
+    Returns:
+        Tuple (has_speech: bool, confidence: float, duration: float, energy: float)
+    """
+    import wave
+    from pathlib import Path
+
+    try:
+        path = Path(file_path)
+        if not path.exists():
+            logger.warning(f"Arquivo não encontrado: {file_path}")
+            return True, 0.5, 0.0, 0.0
+
+        # Ler arquivo WAV
+        with wave.open(str(path), 'rb') as wav:
+            sample_rate = wav.getframerate()
+            n_frames = wav.getnframes()
+            duration = n_frames / sample_rate
+            audio_bytes = wav.readframes(n_frames)
+
+        # Converter para numpy array
+        audio = np.frombuffer(audio_bytes, dtype=np.int16)
+
+        return validate_audio_has_speech(
+            audio=audio,
+            sample_rate=sample_rate,
+            aggressiveness=aggressiveness,
+            min_speech_duration=min_speech_duration,
+            min_confidence=min_confidence,
+        )
+
+    except Exception as e:
+        logger.warning(f"Erro ao validar arquivo {file_path}: {e}")
+        # Em caso de erro, assumir que tem fala
+        return True, 0.5, 0.0, 0.0
+
+
 class SileroVAD:
     """
     VAD usando modelo Silero (mais preciso, mas mais lento).

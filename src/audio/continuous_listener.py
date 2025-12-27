@@ -233,7 +233,15 @@ class ContinuousListener:
                 if audio.duration < self.usb_config.min_audio_duration:
                     logger.debug(f"Áudio muito curto: {audio.duration:.1f}s < {self.usb_config.min_audio_duration}s")
                     continue
-                
+
+                # Verificar se há fala (validação VAD do AudioBuffer)
+                if hasattr(audio, 'has_speech') and not audio.has_speech:
+                    logger.debug(
+                        f"⏭️ Áudio sem fala detectada (VAD), pulando processamento "
+                        f"(confidence={getattr(audio, 'vad_confidence', 0):.2f})"
+                    )
+                    continue
+
                 # Processar áudio
                 self._process_audio(audio)
                 
