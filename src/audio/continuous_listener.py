@@ -222,11 +222,14 @@ class ContinuousListener:
                     continue
                 
                 # Gravar áudio até detectar silêncio
+                # validate_speech só é True se VAD estiver habilitado na config
+                audio_config = self.config.audio
                 audio = self._audio.record(
                     duration=self.usb_config.max_audio_duration,
                     stop_on_silence=self.usb_config.silence_split,
                     silence_duration=self.usb_config.silence_threshold,
                     vad=self._vad,
+                    validate_speech=audio_config.vad_enabled,
                 )
                 
                 # Verificar duração mínima

@@ -165,6 +165,55 @@ class HardwareConfig:
 
 
 @dataclass
+class OfflineQueueConfig:
+    """Configuração da fila offline."""
+    enabled: bool = True
+    db_path: str = "~/.cache/voice-processor/queue.db"
+    max_queue_size: int = 1000
+    retry_delay_base: int = 30
+    max_retries: int = 3
+    connectivity_check_interval: int = 60
+    auto_process_on_reconnect: bool = True
+    use_local_fallback: bool = True
+
+
+@dataclass
+class PowerManagementConfig:
+    """Configuração de gerenciamento de energia."""
+    enabled: bool = True
+    default_mode: str = "balanced"
+    auto_adjust: bool = True
+    disable_hdmi: bool = False
+    disable_bluetooth: bool = False
+    disable_usb: bool = False
+    wifi_power_save: bool = False
+    idle_timeout: int = 60
+    idle_mode: str = "power_save"
+
+
+@dataclass
+class WebAuthConfig:
+    """Configuração de autenticação web."""
+    enabled: bool = False
+    username: str = "admin"
+    password_hash: str = ""
+
+
+@dataclass
+class WebInterfaceConfig:
+    """Configuração da interface web."""
+    enabled: bool = True
+    host: str = "0.0.0.0"
+    port: int = 8080
+    debug: bool = False
+    auth: WebAuthConfig = field(default_factory=WebAuthConfig)
+    cors_enabled: bool = True
+    rate_limit: int = 60
+    auto_refresh: bool = True
+    refresh_interval: int = 30000
+
+
+@dataclass
 class USBReceiverConfig:
     """
     Configuração do modo USB Receiver (Placa de Som USB).
@@ -204,6 +253,9 @@ class Config:
     system: SystemConfig = field(default_factory=SystemConfig)
     hardware: HardwareConfig = field(default_factory=HardwareConfig)
     usb_receiver: USBReceiverConfig = field(default_factory=USBReceiverConfig)
+    offline_queue: OfflineQueueConfig = field(default_factory=OfflineQueueConfig)
+    power_management: PowerManagementConfig = field(default_factory=PowerManagementConfig)
+    web_interface: WebInterfaceConfig = field(default_factory=WebInterfaceConfig)
 
     @classmethod
     def from_dict(cls, data: dict) -> "Config":
@@ -254,6 +306,23 @@ class Config:
         usb_receiver_data = data.get("usb_receiver", {})
         usb_receiver = USBReceiverConfig(**{k: v for k, v in usb_receiver_data.items() if k in USBReceiverConfig.__dataclass_fields__})
 
+        # Offline Queue
+        offline_queue_data = data.get("offline_queue", {})
+        offline_queue = OfflineQueueConfig(**{k: v for k, v in offline_queue_data.items() if k in OfflineQueueConfig.__dataclass_fields__})
+
+        # Power Management
+        power_management_data = data.get("power_management", {})
+        power_management = PowerManagementConfig(**{k: v for k, v in power_management_data.items() if k in PowerManagementConfig.__dataclass_fields__})
+
+        # Web Interface
+        web_interface_data = data.get("web_interface", {})
+        web_auth_data = web_interface_data.pop("auth", {}) if "auth" in web_interface_data else {}
+        web_auth = WebAuthConfig(**{k: v for k, v in web_auth_data.items() if k in WebAuthConfig.__dataclass_fields__})
+        web_interface = WebInterfaceConfig(
+            **{k: v for k, v in web_interface_data.items() if k in WebInterfaceConfig.__dataclass_fields__ and k != "auth"},
+            auth=web_auth,
+        )
+
         return cls(
             mode=data.get("mode", "hybrid"),
             audio=audio,
@@ -263,6 +332,9 @@ class Config:
             system=system,
             hardware=hardware,
             usb_receiver=usb_receiver,
+            offline_queue=offline_queue,
+            power_management=power_management,
+            web_interface=web_interface,
         )
 
 

@@ -268,17 +268,29 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
 
     app.config["CONFIG_PATH"] = config_path
     app.config["SECRET_KEY"] = os.urandom(24)
-    
-    # Configurar captura de logs em memória
-    log_handler = setup_memory_logging()
-    logger.info("🌐 Servidor web iniciado")
+
+    # Carregar configuração completa para verificar feature toggles
+    with open(config_path, "r") as f:
+        full_config = yaml.safe_load(f) or {}
+
+    # Feature toggle: system.memory_logs_enabled
+    system_conf = full_config.get('system', {})
+    memory_logs_enabled = system_conf.get('memory_logs_enabled', True)
+
+    if memory_logs_enabled:
+        log_handler = setup_memory_logging()
+        logger.info("🌐 Servidor web iniciado (memory logs habilitados)")
+    else:
+        log_handler = None
+        logger.info("🌐 Servidor web iniciado (memory logs desabilitados)")
+
+    # Feature toggle: web_interface config
+    web_interface_conf = full_config.get('web_interface', {})
+    app.config["WEB_INTERFACE"] = web_interface_conf
 
     # Configurar LEDs
     try:
         from src.hardware.led import LEDController
-        # Load config
-        with open(config_path, "r") as f:
-            full_config = yaml.safe_load(f) or {}
 
         hardware_conf = full_config.get('hardware', {})
         # Feature toggle: hardware.led_enabled (da UI)
@@ -320,6 +332,82 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
     except Exception as e:
         logger.warning(f"Erro ao iniciar botão: {e}")
         app.button_controller = None
+
+    # ==========================================================================
+    # Feature Toggle: CORS
+    # ==========================================================================
+    cors_enabled = web_interface_conf.get('cors_enabled', True)
+    if cors_enabled:
+        @app.after_request
+        def add_cors_headers(response):
+            """Adiciona headers CORS às respostas."""
+            response.headers['Access-Control-Allow-Origin'] = '*'
+            response.headers['Access-Control-Allow-Methods'] = 'GET, POST, PUT, DELETE, OPTIONS'
+            response.headers['Access-Control-Allow-Headers'] = 'Content-Type, Authorization'
+            return response
+        logger.info("🔓 CORS habilitado")
+    else:
+        logger.info("🔒 CORS desabilitado")
+
+    # ==========================================================================
+    # Feature Toggle: Autenticação Básica
+    # ==========================================================================
+    auth_conf = web_interface_conf.get('auth', {})
+    auth_enabled = auth_conf.get('enabled', False)
+
+    if auth_enabled:
+        from functools import wraps
+        import hashlib
+
+        auth_username = auth_conf.get('username', 'admin')
+        auth_password_hash = auth_conf.get('password_hash', '')
+
+        def check_auth(username, password):
+            """Verifica credenciais."""
+            if not auth_password_hash:
+                # Se não há hash configurado, aceita qualquer senha (primeiro acesso)
+                return username == auth_username
+            # Comparar hash SHA256
+            password_hash = hashlib.sha256(password.encode()).hexdigest()
+            return username == auth_username and password_hash == auth_password_hash
+
+        def authenticate():
+            """Retorna resposta 401."""
+            from flask import Response
+            return Response(
+                'Autenticação necessária', 401,
+                {'WWW-Authenticate': 'Basic realm="Voice Processor"'}
+            )
+
+        def requires_auth(f):
+            """Decorator para rotas que requerem autenticação."""
+            @wraps(f)
+            def decorated(*args, **kwargs):
+                from flask import request
+                auth = request.authorization
+                if not auth or not check_auth(auth.username, auth.password):
+                    return authenticate()
+                return f(*args, **kwargs)
+            return decorated
+
+        # Aplicar autenticação a todas as rotas da API
+        @app.before_request
+        def check_authentication():
+            """Verifica autenticação antes de cada request."""
+            from flask import request
+            # Permitir acesso a arquivos estáticos e páginas públicas
+            if request.path.startswith('/static/') or request.path == '/':
+                return None
+            # Verificar autenticação para rotas da API
+            if request.path.startswith('/api/'):
+                auth = request.authorization
+                if not auth or not check_auth(auth.username, auth.password):
+                    return authenticate()
+            return None
+
+        logger.info(f"🔐 Autenticação habilitada (usuário: {auth_username})")
+    else:
+        logger.info("🔓 Autenticação desabilitada")
 
     # ==========================================================================
     # Funções auxiliares

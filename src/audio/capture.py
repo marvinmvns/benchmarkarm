@@ -283,7 +283,7 @@ class AudioCapture:
         stop_on_silence: bool = True,
         silence_duration: float = 2.0,
         vad: Optional["VoiceActivityDetector"] = None,
-        validate_speech: bool = True,
+        validate_speech: bool = False,
     ) -> AudioBuffer:
         """
         Grava áudio por duração especificada ou até silêncio.
@@ -294,6 +294,7 @@ class AudioCapture:
             silence_duration: Duração do silêncio para parar (segundos)
             vad: Detector de atividade de voz (opcional)
             validate_speech: Se True, valida se o áudio contém fala após gravação
+                             (padrão False - controlado pelo chamador baseado em config)
 
         Returns:
             Buffer de áudio gravado (com has_speech=False se não houver fala)

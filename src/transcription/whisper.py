@@ -211,7 +211,8 @@ class WhisperTranscriber:
         self,
         audio: AudioBuffer | np.ndarray | str,
         language: Optional[str] = None,
-        skip_vad: bool = False,
+        skip_vad: bool = True,
+        vad_enabled: bool = False,
     ) -> TranscriptionResult:
         """
         Transcreve áudio para texto.
@@ -219,7 +220,8 @@ class WhisperTranscriber:
         Args:
             audio: Buffer de áudio, array numpy ou caminho de arquivo
             language: Idioma (usa padrão se None)
-            skip_vad: Se True, pula validação VAD (use quando já validado)
+            skip_vad: Se True, pula validação VAD (padrão True - validação feita em camadas superiores)
+            vad_enabled: Se True E skip_vad=False, executa validação VAD (respeita feature toggle)
 
         Returns:
             Resultado da transcrição
@@ -228,7 +230,8 @@ class WhisperTranscriber:
         start_time = time.time()
 
         # Validação VAD antes de transcrever (evita processar silêncio)
-        if not skip_vad:
+        # Só executa se: skip_vad=False E vad_enabled=True (respeita feature toggle)
+        if not skip_vad and vad_enabled:
             if isinstance(audio, str):
                 has_speech, confidence, duration, energy = validate_audio_file_has_speech(
                     audio, aggressiveness=2, min_speech_duration=0.3
@@ -1483,7 +1486,8 @@ class WhisperAPIClient:
         language: Optional[str] = None,
         translate: Optional[bool] = None,
         word_timestamps: Optional[bool] = None,
-        skip_vad: bool = False,
+        skip_vad: bool = True,
+        vad_enabled: bool = False,
     ) -> TranscriptionResult:
         """
         Transcreve áudio usando WhisperAPI com failover inteligente.
@@ -1500,7 +1504,8 @@ class WhisperAPIClient:
             language: Idioma ('pt', 'en', 'auto', etc.)
             translate: Se True, traduz para inglês
             word_timestamps: Se True, inclui timestamps por palavra
-            skip_vad: Se True, pula validação VAD (use quando já validado)
+            skip_vad: Se True, pula validação VAD (padrão True - validação feita em camadas superiores)
+            vad_enabled: Se True E skip_vad=False, executa validação VAD (respeita feature toggle)
 
         Returns:
             TranscriptionResult com texto, idioma, duração, etc.
@@ -1510,7 +1515,8 @@ class WhisperAPIClient:
         local_job_id = None
 
         # Validação VAD antes de enviar para API (economia de banda/recursos)
-        if not skip_vad:
+        # Só executa se: skip_vad=False E vad_enabled=True (respeita feature toggle)
+        if not skip_vad and vad_enabled:
             if isinstance(audio, str):
                 has_speech, confidence, duration, energy = validate_audio_file_has_speech(
                     audio, aggressiveness=2, min_speech_duration=0.3
