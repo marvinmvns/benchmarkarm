@@ -377,6 +377,26 @@ class VoiceActivityDetector:
         return audio[start:end]
 
 
+# Cache de instâncias VAD por configuração para evitar recriação
+_vad_cache: dict = {}
+
+
+def _get_cached_vad(
+    sample_rate: int,
+    aggressiveness: int,
+    min_speech_duration: float,
+) -> VoiceActivityDetector:
+    """Obtém ou cria uma instância VAD em cache."""
+    cache_key = (sample_rate, aggressiveness, min_speech_duration)
+    if cache_key not in _vad_cache:
+        _vad_cache[cache_key] = VoiceActivityDetector(
+            sample_rate=sample_rate,
+            aggressiveness=aggressiveness,
+            min_speech_duration=min_speech_duration,
+        )
+    return _vad_cache[cache_key]
+
+
 def validate_audio_has_speech(
     audio: np.ndarray,
     sample_rate: int = 16000,
@@ -388,6 +408,7 @@ def validate_audio_has_speech(
     Valida se o áudio contém fala antes de enviar para transcrição.
 
     Função helper reutilizável para validação VAD em qualquer parte do sistema.
+    Usa cache de instâncias VAD para evitar recriação a cada chamada.
 
     Args:
         audio: Array numpy com áudio (int16 ou float)
@@ -401,17 +422,10 @@ def validate_audio_has_speech(
     """
     try:
         # Calcular duração
-        if audio.dtype == np.int16:
-            duration = len(audio) / sample_rate
-        else:
-            duration = len(audio) / sample_rate
+        duration = len(audio) / sample_rate
 
-        # Criar VAD temporário
-        vad = VoiceActivityDetector(
-            sample_rate=sample_rate,
-            aggressiveness=aggressiveness,
-            min_speech_duration=min_speech_duration,
-        )
+        # Reutilizar VAD em cache (evita log "VAD inicializado" repetido)
+        vad = _get_cached_vad(sample_rate, aggressiveness, min_speech_duration)
 
         # Verificar se há fala
         result = vad.is_speech(audio, return_details=True)
