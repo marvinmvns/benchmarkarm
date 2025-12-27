@@ -105,7 +105,17 @@ class ContinuousListener:
         self._processor = None  # VoiceProcessor lazy-loaded
         
         # Diretório de gravações
-        self._save_dir = Path(os.path.expanduser(self.usb_config.save_directory))
+        if self.usb_config.use_ram_storage:
+            # Tentar usar /dev/shm/ (Shared Memory) para evitar escrita em SD
+            ram_path = Path("/dev/shm")
+            if ram_path.exists():
+                self._save_dir = ram_path / "voice-processor"
+                logger.info("💾 Usando RAM (/dev/shm) para gravação temporária")
+            else:
+                self._save_dir = Path("/tmp/voice-processor")
+                logger.warning("⚠️ /dev/shm não encontrado, usando /tmp para gravação temporária")
+        else:
+            self._save_dir = Path(os.path.expanduser(self.usb_config.save_directory))
         
         logger.info("ContinuousListener inicializado")
 

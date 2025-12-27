@@ -501,7 +501,8 @@ function collectFormValues() {
         { id: 'usb_silence_split', key: 'silence_split', type: 'checked' },
         { id: 'usb_silence_threshold', key: 'silence_threshold', type: 'float' },
         { id: 'usb_process_on_disconnect', key: 'process_on_disconnect', type: 'checked' },
-        { id: 'usb_keep_original', key: 'keep_original_audio', type: 'checked' }
+        { id: 'usb_keep_original', key: 'keep_original_audio', type: 'checked' },
+        { id: 'usb_use_ram_storage', key: 'use_ram_storage', type: 'checked' }
     ];
 
     for (const field of usbFields) {

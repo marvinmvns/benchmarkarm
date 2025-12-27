@@ -322,6 +322,10 @@ usb_receiver:
   # Auto-processar arquivos (batch)
   auto_process: true
 
+  # Usar RAM (/dev/shm) para gravação temporária (reduz desgaste SD)
+  use_ram_storage: false
+
+
   # USB Gadget mode (receber áudio via USB)
   usb_gadget_enabled: false
 

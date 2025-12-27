@@ -190,6 +190,7 @@ class USBReceiverConfig:
     usb_gadget_enabled: bool = False                # USB Gadget desabilitado por padrão (requer setup)
     auto_start: bool = False                        # Auto-iniciar escuta ao abrir a aplicação
     auto_process: bool = False                      # Auto-iniciar processamento em lote
+    use_ram_storage: bool = False                   # Usar RAM (/dev/shm) para gravação temporária
 
 
 @dataclass
