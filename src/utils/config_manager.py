@@ -122,25 +122,44 @@ class ConfigManager:
             try:
                 config_path_obj = Path(config_path)
 
-                # Criar backup
+                # Load existing configuration to preserve missing keys
+                existing_config = {}
+                if config_path_obj.exists():
+                    try:
+                        with open(config_path, 'r', encoding='utf-8') as f:
+                            existing_config = yaml.safe_load(f) or {}
+                    except Exception as e_load:
+                        logger.warning(f"Failed to load existing config for merging: {e_load}")
+
+                # Deep merge: add missing keys from existing_config into the new config
+                def deep_merge(base, upd):
+                    for k, v in base.items():
+                        if isinstance(v, dict) and isinstance(upd.get(k), dict):
+                            deep_merge(v, upd[k])
+                        elif k not in upd:
+                            upd[k] = v
+                merged_config = config.copy()
+                deep_merge(existing_config, merged_config)
+
+                # Create backup if needed
                 if create_backup and config_path_obj.exists():
                     import shutil
                     backup_path = config_path_obj.with_suffix('.yaml.bak')
                     shutil.copy(config_path, backup_path)
                     logger.debug(f"Backup criado: {backup_path}")
 
-                # Salvar
+                # Save merged configuration
                 with open(config_path, 'w', encoding='utf-8') as f:
                     yaml.dump(
-                        config,
+                        merged_config,
                         f,
                         default_flow_style=False,
                         allow_unicode=True,
                         sort_keys=False
                     )
 
-                # Atualizar cache
-                self._config = config.copy()
+                # Update cache
+                self._config = merged_config.copy()
                 self._config_path = config_path
                 self._last_mtime = os.path.getmtime(config_path)
 
@@ -148,6 +167,8 @@ class ConfigManager:
                 return True
 
             except Exception as e:
+                logger.error(f"Erro ao salvar configuração: {e}")
+                return False
                 logger.error(f"Erro ao salvar configuração: {e}")
                 return False
 
