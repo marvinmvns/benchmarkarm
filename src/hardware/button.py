@@ -34,13 +34,6 @@ class ButtonController:
         if self.enabled:
             try:
                 GPIO.setmode(GPIO.BCM)
-                
-                # Tentar limpar pino se já estiver em uso
-                try:
-                    GPIO.cleanup(self.BUTTON_PIN)
-                except Exception:
-                    pass
-                    
                 GPIO.setup(self.BUTTON_PIN, GPIO.IN, pull_up_down=GPIO.PUD_UP)
                 
                 # Adicionar evento
