@@ -2128,6 +2128,115 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
             logger.error(f"Erro no teste de speaker: {e}")
             return jsonify({"error": str(e)}), 500
 
+    @app.route("/api/audio/vad/test", methods=["GET"])
+    def test_vad_stream():
+        """
+        Teste de VAD em tempo real via Server-Sent Events.
+        Retorna status do VAD a cada análise de chunk de áudio.
+        """
+        from flask import Response
+        import queue
+        import numpy as np
+
+        def generate_vad_events():
+            """Gera eventos SSE com status do VAD."""
+            from ..audio.capture import AudioCapture
+            from ..audio.vad import VoiceActivityDetector
+
+            config = load_config()
+            audio_config = config.get("audio", {})
+
+            sample_rate = audio_config.get("sample_rate", 16000)
+            vad_config = audio_config.get("vad", {})
+            aggressiveness = vad_config.get("aggressiveness", 2)
+
+            try:
+                # Criar instâncias
+                capture = AudioCapture(
+                    sample_rate=sample_rate,
+                    channels=1,
+                    chunk_size=1024,
+                )
+                vad = VoiceActivityDetector(
+                    sample_rate=sample_rate,
+                    aggressiveness=aggressiveness,
+                )
+
+                capture.open()
+                capture.start_recording()
+
+                # Enviar evento de início
+                yield f"data: {json.dumps({'status': 'started', 'message': 'VAD teste iniciado'})}\n\n"
+
+                # Coletar chunks por 30 segundos (máximo)
+                start_time = time.time()
+                max_duration = 30  # segundos
+
+                while time.time() - start_time < max_duration:
+                    chunk = capture.read_chunk(timeout=0.5)
+                    if chunk is None:
+                        continue
+
+                    # Analisar chunk com VAD
+                    audio_array = np.frombuffer(chunk, dtype=np.int16)
+                    result = vad.is_speech(audio_array, return_details=True)
+
+                    # Calcular nível de áudio (RMS)
+                    rms = np.sqrt(np.mean(audio_array.astype(np.float32) ** 2))
+                    level_db = 20 * np.log10(max(rms, 1)) - 20 * np.log10(32767)  # Normalizado para 0dB = max
+
+                    event_data = {
+                        "status": "analyzing",
+                        "is_speech": result.is_speech,
+                        "confidence": round(result.confidence, 3),
+                        "energy": round(result.energy, 0),
+                        "level_db": round(level_db, 1),
+                        "elapsed": round(time.time() - start_time, 1),
+                    }
+
+                    yield f"data: {json.dumps(event_data)}\n\n"
+
+                # Enviar evento de fim
+                yield f"data: {json.dumps({'status': 'stopped', 'message': 'Teste finalizado'})}\n\n"
+
+            except Exception as e:
+                yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"
+            finally:
+                try:
+                    capture.stop_recording()
+                    capture.close()
+                except Exception:
+                    pass
+
+        return Response(
+            generate_vad_events(),
+            mimetype="text/event-stream",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "X-Accel-Buffering": "no",
+            }
+        )
+
+    @app.route("/api/audio/vad/status", methods=["GET"])
+    def get_vad_status():
+        """Retorna status e configuração do VAD."""
+        config = load_config()
+        audio_config = config.get("audio", {})
+        vad_config = audio_config.get("vad", {})
+
+        return jsonify({
+            "success": True,
+            "vad": {
+                "enabled": vad_config.get("enabled", True),
+                "aggressiveness": vad_config.get("aggressiveness", 2),
+                "min_speech_duration": vad_config.get("min_speech_duration", 0.5),
+            },
+            "audio": {
+                "sample_rate": audio_config.get("sample_rate", 16000),
+            }
+        })
+
     @app.route("/api/test/whisperapi_connection", methods=["POST"])
     def test_whisperapi_connection():
         """Testa conexão com WhisperAPI usando o cliente completo."""

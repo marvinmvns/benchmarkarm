@@ -3063,3 +3063,118 @@ document.addEventListener('DOMContentLoaded', () => {
     refreshIntervals.system = setInterval(refreshSystemInfo, savedInterval);
     refreshIntervals.batch = setInterval(refreshBatchStatus, 60000);
 });
+
+// =============================================================================
+// VAD Test Functions
+// =============================================================================
+
+let vadEventSource = null;
+
+function startVADTest() {
+    // UI elements
+    const btnStart = document.getElementById('btn-vad-start');
+    const btnStop = document.getElementById('btn-vad-stop');
+    const indicator = document.getElementById('vad-indicator');
+    const icon = document.getElementById('vad-icon');
+    const label = document.getElementById('vad-label');
+    const elapsed = document.getElementById('vad-elapsed');
+    const statusText = document.getElementById('vad-status-text');
+
+    // Disable start, enable stop
+    btnStart.disabled = true;
+    btnStop.disabled = false;
+
+    // Reset UI
+    indicator.className = 'vad-indicator vad-silence';
+    icon.textContent = '🔇';
+    label.textContent = 'Ouvindo...';
+    statusText.textContent = 'Conectando ao microfone...';
+
+    // Connect to SSE endpoint
+    vadEventSource = new EventSource('/api/audio/vad/test');
+
+    vadEventSource.onmessage = function(event) {
+        const data = JSON.parse(event.data);
+
+        if (data.status === 'started') {
+            statusText.textContent = 'Teste iniciado - fale algo!';
+        } else if (data.status === 'analyzing') {
+            // Update elapsed time
+            elapsed.textContent = data.elapsed + 's';
+
+            // Update indicator based on speech detection
+            if (data.is_speech) {
+                indicator.className = 'vad-indicator vad-speech';
+                icon.textContent = '🎤';
+                label.textContent = 'Fala Detectada!';
+            } else {
+                indicator.className = 'vad-indicator vad-silence';
+                icon.textContent = '🔇';
+                label.textContent = 'Silêncio';
+            }
+
+            // Update metrics
+            const confidencePercent = Math.round(data.confidence * 100);
+            document.getElementById('vad-confidence').textContent = confidencePercent + '%';
+            document.getElementById('vad-confidence-bar').style.width = confidencePercent + '%';
+
+            // Energy (normalized to 0-100 for display, max ~10000)
+            const energyPercent = Math.min(100, Math.round(data.energy / 100));
+            document.getElementById('vad-energy').textContent = Math.round(data.energy);
+            document.getElementById('vad-energy-bar').style.width = energyPercent + '%';
+
+            // Level dB (range -60 to 0)
+            const levelPercent = Math.max(0, Math.min(100, ((data.level_db + 60) / 60) * 100));
+            document.getElementById('vad-level').textContent = data.level_db + ' dB';
+            document.getElementById('vad-level-bar').style.width = levelPercent + '%';
+
+            // Status text
+            statusText.textContent = data.is_speech ?
+                `Fala detectada (confiança: ${confidencePercent}%)` :
+                `Silêncio (energia: ${Math.round(data.energy)})`;
+
+        } else if (data.status === 'stopped') {
+            stopVADTest();
+            statusText.textContent = 'Teste finalizado (30s máximo)';
+        } else if (data.status === 'error') {
+            stopVADTest();
+            statusText.textContent = 'Erro: ' + data.error;
+            indicator.className = 'vad-indicator vad-idle';
+            icon.textContent = '❌';
+            label.textContent = 'Erro';
+        }
+    };
+
+    vadEventSource.onerror = function(error) {
+        console.error('VAD SSE Error:', error);
+        stopVADTest();
+        statusText.textContent = 'Erro de conexão com o servidor';
+        indicator.className = 'vad-indicator vad-idle';
+        icon.textContent = '❌';
+        label.textContent = 'Erro';
+    };
+}
+
+function stopVADTest() {
+    // Close SSE connection
+    if (vadEventSource) {
+        vadEventSource.close();
+        vadEventSource = null;
+    }
+
+    // UI elements
+    const btnStart = document.getElementById('btn-vad-start');
+    const btnStop = document.getElementById('btn-vad-stop');
+    const indicator = document.getElementById('vad-indicator');
+    const icon = document.getElementById('vad-icon');
+    const label = document.getElementById('vad-label');
+
+    // Enable start, disable stop
+    btnStart.disabled = false;
+    btnStop.disabled = true;
+
+    // Reset indicator to idle
+    indicator.className = 'vad-indicator vad-idle';
+    icon.textContent = '🔇';
+    label.textContent = 'Parado';
+}

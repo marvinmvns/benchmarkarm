@@ -2294,3 +2294,163 @@ input[type="checkbox"] {
         background: rgba(255, 255, 255, 0.05);
     }
 }
+
+/* ==========================================================================
+   VAD Test Section
+   ========================================================================== */
+
+.vad-test-container {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    padding: 16px 0;
+}
+
+.vad-controls {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.vad-elapsed {
+    font-family: monospace;
+    font-size: 1.1rem;
+    color: var(--text-muted);
+    margin-left: auto;
+}
+
+/* Indicador Visual Grande */
+.vad-indicator {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 40px;
+    border-radius: 16px;
+    transition: all 0.3s ease;
+    min-height: 180px;
+}
+
+.vad-indicator.vad-idle {
+    background: linear-gradient(135deg, #374151 0%, #1f2937 100%);
+    border: 3px solid #4b5563;
+}
+
+.vad-indicator.vad-silence {
+    background: linear-gradient(135deg, #1e3a5f 0%, #0f172a 100%);
+    border: 3px solid #3b82f6;
+    animation: pulse-silence 2s infinite;
+}
+
+.vad-indicator.vad-speech {
+    background: linear-gradient(135deg, #065f46 0%, #064e3b 100%);
+    border: 3px solid #10b981;
+    animation: pulse-speech 0.5s infinite;
+}
+
+@keyframes pulse-silence {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.4); }
+    50% { box-shadow: 0 0 0 15px rgba(59, 130, 246, 0); }
+}
+
+@keyframes pulse-speech {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.6); }
+    50% { box-shadow: 0 0 0 20px rgba(16, 185, 129, 0); }
+}
+
+.vad-icon {
+    font-size: 4rem;
+    margin-bottom: 12px;
+    transition: transform 0.2s ease;
+}
+
+.vad-indicator.vad-speech .vad-icon {
+    transform: scale(1.2);
+}
+
+.vad-label {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: #fff;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+/* Métricas */
+.vad-metrics {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 16px;
+}
+
+.vad-metric {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    padding: 12px;
+    background: var(--bg-card);
+    border-radius: 8px;
+    border: 1px solid var(--border);
+}
+
+.vad-metric .metric-label {
+    font-size: 0.85rem;
+    color: var(--text-muted);
+    font-weight: 500;
+}
+
+.vad-metric .metric-bar-container {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.vad-metric .metric-bar {
+    height: 100%;
+    background: var(--primary);
+    border-radius: 4px;
+    transition: width 0.1s ease;
+}
+
+.vad-metric .metric-bar.energy-bar {
+    background: var(--warning);
+}
+
+.vad-metric .metric-bar.level-bar {
+    background: var(--success);
+}
+
+.vad-metric .metric-value {
+    font-family: monospace;
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text);
+}
+
+/* Status */
+.vad-status {
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.05);
+    border-radius: 8px;
+    text-align: center;
+    font-size: 0.9rem;
+    color: var(--text-muted);
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+    .vad-metric {
+        background: rgba(255, 255, 255, 0.05);
+        border-color: rgba(255, 255, 255, 0.1);
+    }
+
+    .vad-metric .metric-bar-container {
+        background: rgba(255, 255, 255, 0.1);
+    }
+
+    .vad-status {
+        background: rgba(255, 255, 255, 0.05);
+    }
+}

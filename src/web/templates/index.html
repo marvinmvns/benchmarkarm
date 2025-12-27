@@ -350,6 +350,68 @@
                         </button>
                     </div>
                 </div>
+
+                <hr>
+
+                <!-- Teste de VAD em Tempo Real -->
+                <div class="status-card">
+                    <h3>🎙️ Teste de VAD (Detecção de Voz)</h3>
+                    <p class="info-box">
+                        Teste a detecção de atividade de voz em tempo real.
+                        O indicador mostra se o microfone detecta fala ou silêncio.
+                    </p>
+
+                    <div class="vad-test-container">
+                        <!-- Controles -->
+                        <div class="vad-controls">
+                            <button type="button" id="btn-vad-start" class="btn btn-primary" onclick="startVADTest()">
+                                ▶️ Iniciar Teste VAD
+                            </button>
+                            <button type="button" id="btn-vad-stop" class="btn btn-danger" onclick="stopVADTest()" disabled>
+                                ⏹️ Parar
+                            </button>
+                            <span id="vad-elapsed" class="vad-elapsed">0.0s</span>
+                        </div>
+
+                        <!-- Indicador Visual Grande -->
+                        <div id="vad-indicator" class="vad-indicator vad-idle">
+                            <div class="vad-icon" id="vad-icon">🔇</div>
+                            <div class="vad-label" id="vad-label">Parado</div>
+                        </div>
+
+                        <!-- Métricas em Tempo Real -->
+                        <div class="vad-metrics">
+                            <div class="vad-metric">
+                                <span class="metric-label">Confiança</span>
+                                <div class="metric-bar-container">
+                                    <div class="metric-bar" id="vad-confidence-bar" style="width: 0%;"></div>
+                                </div>
+                                <span class="metric-value" id="vad-confidence">0%</span>
+                            </div>
+
+                            <div class="vad-metric">
+                                <span class="metric-label">Energia</span>
+                                <div class="metric-bar-container">
+                                    <div class="metric-bar energy-bar" id="vad-energy-bar" style="width: 0%;"></div>
+                                </div>
+                                <span class="metric-value" id="vad-energy">0</span>
+                            </div>
+
+                            <div class="vad-metric">
+                                <span class="metric-label">Nível (dB)</span>
+                                <div class="metric-bar-container">
+                                    <div class="metric-bar level-bar" id="vad-level-bar" style="width: 0%;"></div>
+                                </div>
+                                <span class="metric-value" id="vad-level">-∞</span>
+                            </div>
+                        </div>
+
+                        <!-- Status e Histórico -->
+                        <div class="vad-status">
+                            <span id="vad-status-text">Clique em "Iniciar Teste VAD" para começar</span>
+                        </div>
+                    </div>
+                </div>
             </section>
 
             <!-- Whisper Tab -->
