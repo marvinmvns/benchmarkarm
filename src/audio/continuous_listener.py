@@ -237,15 +237,17 @@ class ContinuousListener:
                     logger.debug(f"Áudio muito curto: {audio.duration:.1f}s < {self.usb_config.min_audio_duration}s")
                     continue
 
-                # Verificar se há fala (validação VAD do AudioBuffer)
+                # VAD é apenas informativo - NÃO pular processamento baseado em VAD
+                # O transcritor é quem decide se há conteúdo útil
+                # Isso evita falsos negativos do VAD que causavam perda de transcrições
                 if hasattr(audio, 'has_speech') and not audio.has_speech:
-                    logger.debug(
-                        f"⏭️ Áudio sem fala detectada (VAD), pulando processamento "
-                        f"(confidence={getattr(audio, 'vad_confidence', 0):.2f})"
+                    logger.info(
+                        f"🔍 VAD indica sem fala (confidence={getattr(audio, 'vad_confidence', 0):.2f}, "
+                        f"energy={getattr(audio, 'vad_energy', 0):.0f}), "
+                        f"mas processando mesmo assim para garantir captura"
                     )
-                    continue
 
-                # Processar áudio
+                # Processar áudio (sempre, independente do VAD)
                 self._process_audio(audio)
                 
             except Exception as e:

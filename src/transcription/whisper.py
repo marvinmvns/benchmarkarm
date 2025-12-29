@@ -811,13 +811,20 @@ class WhisperAPIClient:
             fallback_to_local: Se True, usa whisper.cpp local quando todos os servidores API falharem
             local_config: Configuração para o whisper.cpp local (opcional)
         """
-        # Configurar URLs
-        self.urls = base_urls or [base_url]
-        self.urls = [u.rstrip("/") for u in self.urls if u and u.strip()]
-        if not self.urls:
-            self.urls = ["http://127.0.0.1:3001"]
-
+        # Configurar URLs - inclui base_url + base_urls
+        all_urls = []
+        if base_url and base_url.strip():
+            all_urls.append(base_url.rstrip("/"))
+        if base_urls:
+            for u in base_urls:
+                if u and u.strip():
+                    url_clean = u.rstrip("/")
+                    if url_clean not in all_urls:
+                        all_urls.append(url_clean)
+        
+        self.urls = all_urls if all_urls else ["http://127.0.0.1:3001"]
         self.base_url = self.urls[0]  # Compatibilidade
+
 
         self.language = language
         self.timeout = timeout

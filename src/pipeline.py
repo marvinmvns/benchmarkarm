@@ -120,10 +120,12 @@ class VoiceProcessor:
             'beam_size': whisper_config.beam_size,
             'stream_mode': getattr(whisper_config, 'stream_mode', False),
             'whisperapi_url': getattr(whisper_config, 'whisperapi_url', 'http://127.0.0.1:3001'),
+            'whisperapi_urls': getattr(whisper_config, 'whisperapi_urls', []),  # Lista de servidores para Round Robin
             'whisperapi_timeout': getattr(whisper_config, 'whisperapi_timeout', 300),
         }
         self.transcriber = get_transcriber(config_dict)
-        logger.info(f"Transcritor inicializado: {config_dict.get('provider', 'local')}")
+        urls_count = len(config_dict.get('whisperapi_urls', [])) or 1
+        logger.info(f"Transcritor inicializado: {config_dict.get('provider', 'local')} ({urls_count} servidores)")
 
     def _init_llm(self) -> None:
         """Inicializa provedor LLM."""
@@ -230,24 +232,21 @@ class VoiceProcessor:
         Returns:
             Resultado da transcrição
         """
-        # Validação VAD antes de transcrever
+        # Validação VAD é apenas informativa no pipeline
+        # Não bloqueia transcrição - deixa o servidor decidir
         if not skip_vad and self.config.audio.vad_enabled:
             has_speech, confidence, duration, energy = validate_audio_has_speech(
                 audio.data, sample_rate=audio.sample_rate
             )
             if not has_speech:
                 logger.info(
-                    f"⏭️ VAD (Pipeline): Áudio sem fala detectada "
-                    f"(confidence={confidence:.2f}, energy={energy:.0f})"
+                    f"🔍 VAD (Pipeline): baixa confiança de fala "
+                    f"(confidence={confidence:.2f}, energy={energy:.0f}), "
+                    f"prosseguindo com transcrição mesmo assim"
                 )
-                return TranscriptionResult(
-                    text="",
-                    language=language or self.config.whisper.language,
-                    duration=audio.duration,
-                    processing_time=0.0,
-                    model=self.config.whisper.model,
-                    segments=[],
-                )
+                # NÃO retorna vazio - continua com transcrição
+                # O servidor/transcriber decide se há conteúdo útil
+
 
         # Verificar cache
         if self.cache:

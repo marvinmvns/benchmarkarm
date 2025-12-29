@@ -358,16 +358,136 @@
                     <h3>🎙️ Teste de VAD (Detecção de Voz)</h3>
                     <p class="info-box">
                         Teste a detecção de atividade de voz em tempo real.
-                        O indicador mostra se o microfone detecta fala ou silêncio.
+                        Ajuste os parâmetros abaixo e clique em "Iniciar" para testar.
                     </p>
 
                     <div class="vad-test-container">
+                        <!-- Parâmetros Configuráveis -->
+                        <div class="vad-params">
+                            <h4>⚙️ Parâmetros do WebRTC VAD</h4>
+
+                            <div class="vad-param-row">
+                                <div class="vad-param">
+                                    <label for="vad-test-aggressiveness">🎚️ Agressividade</label>
+                                    <div class="param-control">
+                                        <input type="range" id="vad-test-aggressiveness" min="0" max="3" value="2"
+                                            oninput="document.getElementById('vad-agg-value').textContent = this.value">
+                                        <span id="vad-agg-value" class="param-value">2</span>
+                                    </div>
+                                    <small>0 = sensível (mais detecção, mais falsos positivos)<br>
+                                           3 = agressivo (filtra ruído, pode perder fala suave)</small>
+                                </div>
+
+                                <div class="vad-param">
+                                    <label for="vad-test-sample-rate">📊 Taxa de Amostragem</label>
+                                    <div class="param-control">
+                                        <select id="vad-test-sample-rate">
+                                            <option value="8000">8000 Hz (telefone)</option>
+                                            <option value="16000" selected>16000 Hz (Whisper ideal)</option>
+                                            <option value="32000">32000 Hz (alta qualidade)</option>
+                                            <option value="48000">48000 Hz (máxima)</option>
+                                        </select>
+                                    </div>
+                                    <small>WebRTC VAD suporta: 8k, 16k, 32k, 48k</small>
+                                </div>
+
+                                <div class="vad-param">
+                                    <label for="vad-test-frame-duration">⏱️ Duração do Frame</label>
+                                    <div class="param-control">
+                                        <select id="vad-test-frame-duration">
+                                            <option value="10">10 ms (mais responsivo)</option>
+                                            <option value="20">20 ms (balanceado)</option>
+                                            <option value="30" selected>30 ms (mais estável)</option>
+                                        </select>
+                                    </div>
+                                    <small>Tamanho do chunk analisado. WebRTC aceita: 10, 20, 30ms</small>
+                                </div>
+                            </div>
+
+                            <div class="vad-param-row">
+                                <div class="vad-param">
+                                    <label for="vad-test-min-speech-duration">🗣️ Duração Mínima de Fala</label>
+                                    <div class="param-control">
+                                        <input type="range" id="vad-test-min-speech-duration" min="0.1" max="2.0" value="0.5" step="0.1"
+                                            oninput="document.getElementById('vad-min-speech-value').textContent = this.value + 's'">
+                                        <span id="vad-min-speech-value" class="param-value">0.5s</span>
+                                    </div>
+                                    <small>Tempo mínimo de fala contínua para validar detecção</small>
+                                </div>
+
+                                <div class="vad-param">
+                                    <label for="vad-test-min-confidence">📈 Confiança Mínima</label>
+                                    <div class="param-control">
+                                        <input type="range" id="vad-test-min-confidence" min="0" max="100" value="10" step="5"
+                                            oninput="document.getElementById('vad-conf-value').textContent = this.value + '%'">
+                                        <span id="vad-conf-value" class="param-value">10%</span>
+                                    </div>
+                                    <small>% mínimo de frames com fala para validar</small>
+                                </div>
+
+                                <div class="vad-param">
+                                    <label for="vad-test-energy-threshold">⚡ Limiar de Energia</label>
+                                    <div class="param-control">
+                                        <input type="range" id="vad-test-energy-threshold" min="0" max="10000" value="500" step="100"
+                                            oninput="document.getElementById('vad-energy-thresh-value').textContent = this.value">
+                                        <span id="vad-energy-thresh-value" class="param-value">500</span>
+                                    </div>
+                                    <small>Energia RMS mínima (0 = sem filtro de energia)</small>
+                                </div>
+                            </div>
+
+                            <div class="vad-param-row">
+                                <div class="vad-param">
+                                    <label for="vad-test-duration">⏰ Duração do Teste</label>
+                                    <div class="param-control">
+                                        <select id="vad-test-duration">
+                                            <option value="10">10 segundos</option>
+                                            <option value="15">15 segundos</option>
+                                            <option value="30" selected>30 segundos</option>
+                                            <option value="60">1 minuto</option>
+                                            <option value="120">2 minutos</option>
+                                            <option value="300">5 minutos</option>
+                                        </select>
+                                    </div>
+                                    <small>Tempo máximo de captura do teste</small>
+                                </div>
+
+                                <div class="vad-param">
+                                    <label>
+                                        <input type="checkbox" id="vad-test-use-cache" checked>
+                                        💾 Usar Cache VAD
+                                    </label>
+                                    <small>Cache de resultados (reduz CPU em ~15%)</small>
+                                </div>
+
+                                <div class="vad-param">
+                                    <label>
+                                        <input type="checkbox" id="vad-test-show-waveform">
+                                        📉 Mostrar Forma de Onda
+                                    </label>
+                                    <small>Visualização de amplitude (usa mais CPU)</small>
+                                </div>
+                            </div>
+
+                            <div class="vad-param-actions">
+                                <button type="button" class="btn btn-small btn-secondary" onclick="resetVADParams()">
+                                    🔄 Restaurar Padrões
+                                </button>
+                                <button type="button" class="btn btn-small btn-secondary" onclick="loadVADParamsFromConfig()">
+                                    📥 Carregar da Config
+                                </button>
+                                <button type="button" class="btn btn-small" onclick="saveVADParamsToConfig()">
+                                    💾 Salvar na Config
+                                </button>
+                            </div>
+                        </div>
+
                         <!-- Controles -->
                         <div class="vad-controls">
-                            <button type="button" id="btn-vad-start" class="btn btn-primary" onclick="startVADTest()">
+                            <button type="button" id="btn-vad-start" class="btn btn-primary btn-large" onclick="startVADTest()">
                                 ▶️ Iniciar Teste VAD
                             </button>
-                            <button type="button" id="btn-vad-stop" class="btn btn-danger" onclick="stopVADTest()" disabled>
+                            <button type="button" id="btn-vad-stop" class="btn btn-danger btn-large" onclick="stopVADTest()" disabled>
                                 ⏹️ Parar
                             </button>
                             <span id="vad-elapsed" class="vad-elapsed">0.0s</span>
@@ -406,9 +526,29 @@
                             </div>
                         </div>
 
-                        <!-- Status e Histórico -->
+                        <!-- Estatísticas do Teste -->
+                        <div class="vad-stats">
+                            <div class="vad-stat">
+                                <span class="stat-label">Detecções de Fala</span>
+                                <span class="stat-value" id="vad-speech-count">0</span>
+                            </div>
+                            <div class="vad-stat">
+                                <span class="stat-label">Tempo com Fala</span>
+                                <span class="stat-value" id="vad-speech-time">0.0s</span>
+                            </div>
+                            <div class="vad-stat">
+                                <span class="stat-label">% do Tempo</span>
+                                <span class="stat-value" id="vad-speech-percent">0%</span>
+                            </div>
+                            <div class="vad-stat">
+                                <span class="stat-label">Energia Média</span>
+                                <span class="stat-value" id="vad-avg-energy">0</span>
+                            </div>
+                        </div>
+
+                        <!-- Status -->
                         <div class="vad-status">
-                            <span id="vad-status-text">Clique em "Iniciar Teste VAD" para começar</span>
+                            <span id="vad-status-text">Configure os parâmetros e clique em "Iniciar Teste VAD"</span>
                         </div>
                     </div>
                 </div>

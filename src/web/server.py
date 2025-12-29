@@ -316,6 +316,58 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
     app.listener = ContinuousListener(config_path, app.led_controller)
     app.listener.start()
 
+    # ==========================================================================
+    # Inicializar BatchProcessor para recuperar arquivos pendentes ao startup
+    # Garante que áudios capturados antes de perda de energia/rede sejam processados
+    # ==========================================================================
+    try:
+        from ..utils.batch_processor import BatchProcessor
+        from ..utils.config_manager import get_config_manager
+        startup_cm = get_config_manager()
+        startup_config = startup_cm.load_config(config_path)
+        usb_config = startup_config.get("usb_receiver", {})
+        audio_dir = usb_config.get("save_directory", "~/audio-recordings")
+        
+        # Criar batch processor
+        startup_batch_processor = BatchProcessor(
+            audio_dir=audio_dir,
+            config_path=config_path,
+            interval_minutes=5,
+            max_files_per_run=20,
+        )
+        
+        # Recuperar jobs pendentes do JobManager
+        recovered = startup_batch_processor.recover_pending_jobs()
+        if recovered > 0:
+            logger.info(f"🔄 {recovered} jobs pendentes recuperados após restart")
+        
+        # Verificar arquivos WAV pendentes
+        pending_files = startup_batch_processor.get_pending_files()
+        if pending_files:
+            logger.info(f"📂 {len(pending_files)} arquivos WAV pendentes encontrados - iniciando processamento")
+            # Processar em background thread
+            def process_pending_startup():
+                import time
+                time.sleep(10)  # Aguardar sistema estabilizar
+                try:
+                    processed = startup_batch_processor.process_pending(max_files=len(pending_files))
+                    logger.info(f"✅ Startup: {processed} arquivos processados")
+                except Exception as e:
+                    logger.error(f"❌ Erro no processamento inicial: {e}")
+            
+            import threading
+            pending_thread = threading.Thread(target=process_pending_startup, daemon=True)
+            pending_thread.start()
+        
+        # Iniciar processamento periódico em background
+        startup_batch_processor.start()
+        app.batch_processor = startup_batch_processor
+        logger.info("🔄 BatchProcessor inicializado e processamento periódico ativo")
+        
+    except Exception as e:
+        logger.warning(f"Falha ao inicializar BatchProcessor: {e}")
+        app.batch_processor = None
+
     # Inicializar Botão
     try:
         from src.hardware.button import ButtonController
@@ -332,6 +384,7 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
     except Exception as e:
         logger.warning(f"Erro ao iniciar botão: {e}")
         app.button_controller = None
+
 
     # ==========================================================================
     # Feature Toggle: CORS
@@ -2133,44 +2186,85 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
         """
         Teste de VAD em tempo real via Server-Sent Events.
         Retorna status do VAD a cada análise de chunk de áudio.
+
+        Query Parameters:
+            aggressiveness: int (0-3) - Nível de agressividade do VAD
+            sample_rate: int - Taxa de amostragem (8000, 16000, 32000, 48000)
+            frame_duration: int - Duração do frame em ms (10, 20, 30)
+            min_speech_duration: float - Duração mínima de fala para validar
+            min_confidence: int - Confiança mínima % (0-100)
+            energy_threshold: int - Limiar de energia RMS
+            duration: int - Duração máxima do teste em segundos
         """
         from flask import Response
-        import queue
         import numpy as np
+
+        # Ler parâmetros da query string
+        aggressiveness = request.args.get("aggressiveness", 2, type=int)
+        sample_rate = request.args.get("sample_rate", 16000, type=int)
+        frame_duration = request.args.get("frame_duration", 30, type=int)
+        min_speech_duration = request.args.get("min_speech_duration", 0.5, type=float)
+        min_confidence = request.args.get("min_confidence", 10, type=int)
+        energy_threshold = request.args.get("energy_threshold", 500, type=int)
+        max_duration = request.args.get("duration", 30, type=int)
+
+        # Validar parâmetros
+        aggressiveness = max(0, min(3, aggressiveness))
+        sample_rate = sample_rate if sample_rate in [8000, 16000, 32000, 48000] else 16000
+        frame_duration = frame_duration if frame_duration in [10, 20, 30] else 30
+        min_speech_duration = max(0.1, min(2.0, min_speech_duration))
+        min_confidence = max(0, min(100, min_confidence))
+        energy_threshold = max(0, min(10000, energy_threshold))
+        max_duration = max(10, min(300, max_duration))
+
+        # Calcular chunk_size baseado no frame_duration
+        chunk_size = int(sample_rate * frame_duration / 1000)
 
         def generate_vad_events():
             """Gera eventos SSE com status do VAD."""
             from ..audio.capture import AudioCapture
             from ..audio.vad import VoiceActivityDetector
 
-            config = load_config()
-            audio_config = config.get("audio", {})
-
-            sample_rate = audio_config.get("sample_rate", 16000)
-            vad_config = audio_config.get("vad", {})
-            aggressiveness = vad_config.get("aggressiveness", 2)
-
             try:
-                # Criar instâncias
+                # Criar instâncias com parâmetros personalizados
                 capture = AudioCapture(
                     sample_rate=sample_rate,
                     channels=1,
-                    chunk_size=1024,
+                    chunk_size=chunk_size,
                 )
                 vad = VoiceActivityDetector(
                     sample_rate=sample_rate,
                     aggressiveness=aggressiveness,
+                    min_speech_duration=min_speech_duration,
                 )
 
                 capture.open()
                 capture.start_recording()
 
-                # Enviar evento de início
-                yield f"data: {json.dumps({'status': 'started', 'message': 'VAD teste iniciado'})}\n\n"
+                # Enviar evento de início com parâmetros
+                start_params = {
+                    "status": "started",
+                    "message": "VAD teste iniciado",
+                    "params": {
+                        "aggressiveness": aggressiveness,
+                        "sample_rate": sample_rate,
+                        "frame_duration": frame_duration,
+                        "min_speech_duration": min_speech_duration,
+                        "min_confidence": min_confidence,
+                        "energy_threshold": energy_threshold,
+                        "duration": max_duration,
+                    }
+                }
+                yield f"data: {json.dumps(start_params)}\n\n"
 
-                # Coletar chunks por 30 segundos (máximo)
+                # Estatísticas
+                speech_frames = 0
+                total_frames = 0
+                speech_time = 0.0
+                last_frame_time = time.time()
+
+                # Coletar chunks
                 start_time = time.time()
-                max_duration = 30  # segundos
 
                 while time.time() - start_time < max_duration:
                     chunk = capture.read_chunk(timeout=0.5)
@@ -2183,21 +2277,60 @@ def create_app(config_path: Optional[str] = None) -> "Flask":
 
                     # Calcular nível de áudio (RMS)
                     rms = np.sqrt(np.mean(audio_array.astype(np.float32) ** 2))
-                    level_db = 20 * np.log10(max(rms, 1)) - 20 * np.log10(32767)  # Normalizado para 0dB = max
+                    level_db = 20 * np.log10(max(rms, 1)) - 20 * np.log10(32767)
+
+                    # Aplicar filtro de energia
+                    is_speech = result.is_speech
+                    if energy_threshold > 0 and result.energy < energy_threshold:
+                        is_speech = False
+
+                    # Aplicar filtro de confiança mínima
+                    confidence_pct = result.confidence * 100
+                    if confidence_pct < min_confidence:
+                        is_speech = False
+
+                    # Atualizar estatísticas
+                    total_frames += 1
+                    now = time.time()
+                    frame_elapsed = now - last_frame_time
+                    last_frame_time = now
+
+                    if is_speech:
+                        speech_frames += 1
+                        speech_time += frame_elapsed
 
                     event_data = {
                         "status": "analyzing",
-                        "is_speech": result.is_speech,
+                        "is_speech": is_speech,
+                        "is_speech_raw": result.is_speech,
                         "confidence": round(result.confidence, 3),
                         "energy": round(result.energy, 0),
                         "level_db": round(level_db, 1),
                         "elapsed": round(time.time() - start_time, 1),
+                        "remaining": round(max_duration - (time.time() - start_time), 1),
+                        "stats": {
+                            "speech_frames": speech_frames,
+                            "total_frames": total_frames,
+                            "speech_time": round(speech_time, 1),
+                            "speech_pct": round(speech_frames / max(1, total_frames) * 100, 1),
+                        }
                     }
 
                     yield f"data: {json.dumps(event_data)}\n\n"
 
-                # Enviar evento de fim
-                yield f"data: {json.dumps({'status': 'stopped', 'message': 'Teste finalizado'})}\n\n"
+                # Enviar evento de fim com estatísticas finais
+                final_stats = {
+                    "status": "stopped",
+                    "message": "Teste finalizado",
+                    "stats": {
+                        "speech_frames": speech_frames,
+                        "total_frames": total_frames,
+                        "speech_time": round(speech_time, 1),
+                        "speech_pct": round(speech_frames / max(1, total_frames) * 100, 1),
+                        "duration": round(time.time() - start_time, 1),
+                    }
+                }
+                yield f"data: {json.dumps(final_stats)}\n\n"
 
             except Exception as e:
                 yield f"data: {json.dumps({'status': 'error', 'error': str(e)})}\n\n"
